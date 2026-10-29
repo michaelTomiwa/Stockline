@@ -1,0 +1,84 @@
+@import "tailwindcss";
+
+/*
+  Stockline palette: a calm sage-grey workspace, a deep pine sidebar and
+  one citrus highlight for "this is where you are". Status colours are
+  reserved for stock health so they always mean the same thing.
+*/
+:root {
+  --bg: #f1f3ee; /* workspace */
+  --panel: #ffffff; /* cards, tables */
+  --sunk: #f7f8f5; /* inputs, table headers */
+  --line: #e0e4dc; /* borders */
+  --ink: #141a17; /* primary text */
+  --muted: #59635d; /* secondary text */
+  --faint: #8b948e; /* hints, axis labels */
+  --pine: #1f5f4a; /* primary actions */
+  --pine-deep: #123d2f; /* hover, sidebar */
+  --night: #0f201a; /* sidebar background */
+  --citrus: #d6f26b; /* active nav, highlights */
+  --ok: #2f855a; /* in stock, money in */
+  --low: #b7791f; /* low stock */
+  --out: #c2410c; /* out of stock, errors */
+  --move: #3a6ea5; /* transfers */
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-panel: var(--panel);
+  --color-sunk: var(--sunk);
+  --color-line: var(--line);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-pine: var(--pine);
+  --color-pine-deep: var(--pine-deep);
+  --color-night: var(--night);
+  --color-citrus: var(--citrus);
+  --color-ok: var(--ok);
+  --color-low: var(--low);
+  --color-out: var(--out);
+  --color-move: var(--move);
+
+  --font-sans: var(--font-schibsted);
+  --font-mono: var(--font-jetbrains);
+}
+
+html {
+  background: var(--bg);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+}
+
+body {
+  background: var(--bg);
+  min-height: 100dvh;
+  font-family: var(--font-schibsted), system-ui, sans-serif;
+}
+
+::selection {
+  background: var(--citrus);
+  color: var(--ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--pine);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Schibsted's tabular figures also widen commas and points ("₦4 , 800"),
+   so numbers keep their natural spacing and line up by right-aligning. */
+.tnum {
+  font-variant-numeric: lining-nums;
+}
+
+input[type="number"]::-webkit-inner-spin-button {
+  opacity: 0.4;
+}
+
+@media print {
+  aside, header, .no-print {
+    display: none !important;
+  }
+}

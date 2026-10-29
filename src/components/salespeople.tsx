@@ -225,9 +225,10 @@ function SalespersonForm({
       )}
       <Field label="Phone (WhatsApp)" name="phone" type="tel" defaultValue={person?.phone ?? ""} placeholder="0803 000 0000" hint="Optional. Lets you send them their login on WhatsApp." />
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Monthly target (₦)" name="monthly_target" type="number" min={0} step={1000} defaultValue={person?.monthly_target ?? ""} placeholder="e.g. 1500000" />
-        <Field label="Commission (%)" name="commission_rate" type="number" min={0} max={100} step={0.5} defaultValue={person?.commission_rate ?? ""} placeholder="e.g. 2.5" />
+        <Field label="Monthly target (₦)" name="monthly_target" type="number" min={0} step={1000} defaultValue={person?.monthly_target ?? ""} placeholder="Optional" />
+        <Field label="Commission (%)" name="commission_rate" type="number" min={0} max={100} step={0.5} defaultValue={person?.commission_rate || ""} placeholder="Optional" />
       </div>
+      <p className="-mt-2 text-xs text-faint">Both are optional. Leave commission empty if you don&rsquo;t pay one; it won&rsquo;t show anywhere.</p>
       <ErrorNote message={error} />
       <Button busy={busy} className="h-11 w-full">
         {editing ? "Save changes" : (

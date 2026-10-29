@@ -119,11 +119,9 @@ export default async function SalespersonPage({ params }: PageProps<"/app/salesp
         {[
           { label: "Today", value: money(p.today.revenue, cur), sub: `${p.today.orders} ${p.today.orders === 1 ? "sale" : "sales"}` },
           { label: `${monthName} so far`, value: money(p.month.revenue, cur), sub: `${p.month.orders} sales · ${qty(p.month.units)} items` },
-          {
-            label: "Commission earned",
-            value: money(p.commission, cur),
-            sub: p.commission_rate ? `${p.commission_rate}% of ${monthName} sales` : "No commission set",
-          },
+          p.commission_rate > 0
+            ? { label: "Commission earned", value: money(p.commission, cur), sub: `${p.commission_rate}% of ${monthName} sales` }
+            : { label: "Items sold", value: qty(p.month.units), sub: `${monthName} so far` },
           {
             label: "Average sale",
             value: money(orders30 ? total30 / orders30 : 0, cur),

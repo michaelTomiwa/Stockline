@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, CircleCheck, MessageCircle, Minus, Plus, Printer, Search, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/browser";
+import { notifySale } from "@/app/app/actions";
 import type { Category, Product, Store, Supplier } from "@/lib/types";
 import { stockStatus } from "@/lib/types";
 import { cn, dateTime, money, qty } from "@/lib/format";
@@ -127,7 +128,7 @@ export function StockForm({
             ? { product_id: l.product.id, quantity: l.quantity, unit_price: l.price }
             : { product_id: l.product.id, quantity: l.quantity },
     );
-    const { error } =
+    const { data, error } =
       mode === "transfer"
         ? await supabase.rpc("transfer_stock", { p_from: store, p_to: toStore, p_items: items, p_note: note })
         : mode === "count"
@@ -142,6 +143,8 @@ export function StockForm({
             });
     setBusy(false);
     if (error) return setError(friendlyError(error.message));
+    // Email the owner about the sale if they've asked for that; never holds up the till.
+    if (mode === "sell" && typeof data === "string") notifySale(data).catch(() => {});
     setDone({ lines, total, at: new Date().toISOString(), storeName: stores.find((x) => x.id === store)?.name ?? "", reference });
     setLines([]);
     setReference("");

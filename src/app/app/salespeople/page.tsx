@@ -64,7 +64,9 @@ export default async function SalespeoplePage() {
           { label: "Salespeople", value: String(active.length), sub: rows.length > active.length ? `${rows.length - active.length} turned off` : "All active" },
           { label: "Sold by them today", value: money(today, cur), sub: `${todayOrders} ${todayOrders === 1 ? "sale" : "sales"}` },
           { label: `Sold in ${monthName}`, value: money(month, cur), sub: `${rows.reduce((s, r) => s + r.month.orders, 0)} sales` },
-          { label: "Commission earned", value: money(commission, cur), sub: `${monthName}, so far` },
+          rows.some((r) => r.commission_rate > 0)
+            ? { label: "Commission earned", value: money(commission, cur), sub: `${monthName}, so far` }
+            : { label: "Average sale", value: money(rows.reduce((s, r) => s + r.month.orders, 0) ? month / rows.reduce((s, r) => s + r.month.orders, 0) : 0, cur), sub: monthName },
         ].map((s) => (
           <div key={s.label} className="bg-panel p-4 sm:p-5">
             <p className="text-sm text-muted">{s.label}</p>
@@ -150,7 +152,7 @@ function Avatar({ name, color }: { name: string; color?: string }) {
 
 function HowItWorks() {
   const steps = [
-    { icon: UserPlus, title: "Create their account", body: "Pick a username and password and the store they work at. No email needed." },
+    { icon: UserPlus, title: "Create their account", body: "Pick a username, password and the store they work at. No email needed. A target and commission are optional." },
     { icon: MessageCircle, title: "Send them the login", body: "One tap sends it on WhatsApp. They sign in on the normal sign-in page." },
     { icon: ShoppingCart, title: "They sell, you watch", body: "Sales are credited to them, always at your prices. They only see their own figures." },
     { icon: KeyRound, title: "Stay in control", body: "Reset a password or turn an account off at any time. Their sales history stays." },

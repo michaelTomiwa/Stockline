@@ -20,7 +20,7 @@ One owner, several stores. Track what comes in, what sells, what moves between s
 | **Team** | Invite managers and staff by email and assign them to a store |
 | **Settings** | Business name and currency; load sample data on a fresh account |
 
-After each sale there's a receipt to print or send to the customer on WhatsApp.
+After each sale there's a receipt to print or send to the customer on WhatsApp, and the owner can get an email about it (Settings → Email alerts; needs `RESEND_API_KEY`, see `.env.example`).
 
 The **admin area** at `/admin` shows every business on the platform: owners, stores, people, stock value, sales and recent activity. Only emails listed in `platform_admins` can open it.
 

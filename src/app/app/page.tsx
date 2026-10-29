@@ -9,17 +9,22 @@ import { HealthBar, RevenueChart } from "@/components/charts";
 import { Onboarding } from "@/components/onboarding";
 import { CountUp, FadeIn, Reveal } from "@/components/motion";
 import { lastDays } from "@/lib/dates";
+import { SalesHome } from "@/components/sales-home";
+import { TargetBar } from "@/components/salespeople";
+import { loadSalespeople } from "@/lib/salespeople";
+import { lagosMonthProgress } from "@/lib/dates";
 
 export const metadata = { title: "Overview" };
 
 export default async function Overview() {
   const ctx = await getContext();
+  if (ctx.isSales) return <SalesHome ctx={ctx} />;
   const cur = ctx.business.currency;
   const storeIds = scopeStoreIds(ctx);
   const storeParam = ctx.activeStore === "all" ? null : ctx.activeStore;
   const scopeStores = ctx.stores.filter((s) => storeIds.includes(s.id));
 
-  const [{ products }, levels, salesRes, topRes, storeSalesRes, recentRes] = await Promise.all([
+  const [{ products }, levels, salesRes, topRes, storeSalesRes, recentRes, sellers] = await Promise.all([
     loadCatalog(ctx),
     loadLevels(ctx, storeIds),
     ctx.supabase.rpc("sales_by_day", { p_days: 30, p_store: storeParam }),
@@ -31,6 +36,7 @@ export default async function Overview() {
       .in("store_id", storeIds.length ? storeIds : ["00000000-0000-0000-0000-000000000000"])
       .order("created_at", { ascending: false })
       .limit(10),
+    loadSalespeople(ctx, { scopeToActiveStore: true }),
   ]);
 
   if (products.length === 0 || ctx.stores.length === 0) {
@@ -207,6 +213,32 @@ export default async function Overview() {
         </Reveal>
 
         <div className="space-y-6">
+          {sellers.some((p) => p.active) && (
+            <Reveal delay={0.05}>
+              <Card
+                title={`Salespeople, ${lagosMonthProgress().monthName}`}
+                action={ctx.canManage && <Link href="/app/salespeople" className="text-sm font-medium text-pine hover:underline">Manage</Link>}
+              >
+                <ul className="divide-y divide-line">
+                  {sellers.filter((p) => p.active).slice(0, 5).map((p) => (
+                    <li key={p.user_id} className="px-5 py-3">
+                      <div className="flex items-baseline justify-between gap-3 text-sm">
+                        <Link href={ctx.canManage ? `/app/salespeople/${p.user_id}` : "#"} className="flex min-w-0 items-center gap-2 font-medium hover:text-pine">
+                          <StoreDot color={p.store?.color ?? "#123d2f"} className="size-2" />
+                          <span className="truncate">{p.full_name}</span>
+                        </Link>
+                        <span className="shrink-0 tnum">
+                          {money(p.month.revenue, cur)}
+                          <span className="ml-2 text-xs text-faint">{money(p.today.revenue, cur)} today</span>
+                        </span>
+                      </div>
+                      <TargetBar pct={p.targetPct} className="mt-2 h-1.5" />
+                    </li>
+                  ))}
+                </ul>
+              </Card>
+            </Reveal>
+          )}
           <Reveal delay={0.05}>
             <Card title="Best sellers, 30 days">
               <ul className="space-y-3 px-5 py-4">

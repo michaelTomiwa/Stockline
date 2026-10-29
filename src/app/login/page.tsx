@@ -5,7 +5,7 @@ export const metadata = { title: "Sign in" };
 
 const errors: Record<string, string> = {
   expired: "That link has expired. Sign in or request a new one.",
-  "no-business": "This account isn't linked to a business yet. Ask the owner to invite you, or create a new account.",
+  "no-business": "This account isn't active. It may have been turned off, or not linked to a business yet. Ask the owner, or sign in with another account.",
 };
 
 export default async function LoginPage({ searchParams }: PageProps<"/login">) {

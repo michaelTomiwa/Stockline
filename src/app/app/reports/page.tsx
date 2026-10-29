@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getContext } from "@/lib/context";
+import { getStockContext } from "@/lib/context";
 import { loadCatalog, loadLevels, scopeStoreIds, stockGrid } from "@/lib/inventory";
 import { num } from "@/lib/types";
 import { cn, money, qty } from "@/lib/format";
@@ -16,13 +16,13 @@ const PALETTE = ["#1F5F4A", "#3A6EA5", "#B7791F", "#8B3A62", "#2F855A", "#C2410C
 export default async function ReportsPage({ searchParams }: PageProps<"/app/reports">) {
   const sp = await searchParams;
   const days = [7, 30, 90].includes(Number(sp.days)) ? Number(sp.days) : 30;
-  const ctx = await getContext();
+  const ctx = await getStockContext();
   const cur = ctx.business.currency;
   const storeIds = scopeStoreIds(ctx);
   const storeParam = ctx.activeStore === "all" ? null : ctx.activeStore;
   const since = isoDaysAgo(days);
 
-  const [{ products, categories }, levels, dayRes, prodRes, storeRes, salesRows] = await Promise.all([
+  const [{ products, categories }, levels, dayRes, prodRes, storeRes, salesRows, personRes, membersRes] = await Promise.all([
     loadCatalog(ctx),
     loadLevels(ctx, storeIds),
     ctx.supabase.rpc("sales_by_day", { p_days: days, p_store: storeParam }),
@@ -35,6 +35,8 @@ export default async function ReportsPage({ searchParams }: PageProps<"/app/repo
       .in("store_id", storeIds.length ? storeIds : ["00000000-0000-0000-0000-000000000000"])
       .gte("created_at", since)
       .limit(10000),
+    ctx.supabase.rpc("sales_by_person", { p_since: since, p_store: storeParam }),
+    ctx.supabase.from("members").select("user_id, full_name, email, role, store_id"),
   ]);
 
   const byDay = new Map(((dayRes.data ?? []) as { day: string; revenue: unknown; cost: unknown; orders: unknown }[]).map((d) => [d.day, d]));
@@ -47,6 +49,26 @@ export default async function ReportsPage({ searchParams }: PageProps<"/app/repo
   const orders = series.reduce((s, d) => s + d.orders, 0);
 
   const productById = new Map(products.map((p) => [p.id, p]));
+
+  // Who rang up the sales in this period.
+  const memberById = new Map(
+    ((membersRes.data ?? []) as { user_id: string; full_name: string | null; email: string | null; role: string; store_id: string | null }[]).map((m) => [m.user_id, m]),
+  );
+  const storeColor = new Map(ctx.stores.map((st) => [st.id, st.color]));
+  const personRows = ((personRes.data ?? []) as { user_id: string | null; revenue: unknown; cost: unknown; orders: unknown }[])
+    .map((r) => {
+      const m = r.user_id ? memberById.get(r.user_id) : undefined;
+      const rev = num(r.revenue);
+      return {
+        label: m ? `${m.full_name || m.email || "Team member"}${m.role === "sales" ? "" : ` (${m.role})`}` : "Former team member",
+        color: (m?.store_id && storeColor.get(m.store_id)) || "#123d2f",
+        revenue: rev,
+        profit: rev - num(r.cost),
+        sub: `${num(r.orders)} sales · ${money(num(r.orders) ? rev / num(r.orders) : 0, cur)} average`,
+      };
+    })
+    .sort((a, b) => b.revenue - a.revenue)
+    .slice(0, 8);
   const prodSales = ((prodRes.data ?? []) as { product_id: string; units: unknown; revenue: unknown; profit: unknown }[]).map((r) => ({
     product: productById.get(r.product_id),
     units: num(r.units),
@@ -139,6 +161,19 @@ export default async function ReportsPage({ searchParams }: PageProps<"/app/repo
             </Card>
           </Reveal>
         )}
+        {personRows.length > 1 && (
+          <Reveal delay={0.05}>
+            <Card
+              title="Sales by person"
+              className="h-full"
+              action={ctx.canManage && <Link href="/app/salespeople" className="text-sm font-medium text-pine hover:underline">Salespeople</Link>}
+            >
+              <div className="p-5">
+                <CompareBars rows={personRows} currency={cur} />
+              </div>
+            </Card>
+          </Reveal>
+        )}
         <Reveal delay={0.05}>
           <Card title="Where your stock value sits" className="h-full">
             <div className="p-5">
@@ -154,7 +189,8 @@ export default async function ReportsPage({ searchParams }: PageProps<"/app/repo
             </div>
           </Card>
         </Reveal>
-        <Reveal delay={0.05}>
+        {/* Full width when it would otherwise sit alone on the last row. */}
+        <Reveal delay={0.05} className={((storeRows.length > 1 && ctx.activeStore === "all" ? 1 : 0) + (personRows.length > 1 ? 1 : 0)) % 2 === 1 ? "lg:col-span-2" : undefined}>
           <Card title="Slow movers" className="h-full">
             <ul className="divide-y divide-line">
               {slow.map((r) => (

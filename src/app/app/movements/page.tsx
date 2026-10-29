@@ -48,7 +48,7 @@ export default async function MovementsPage({ searchParams }: PageProps<"/app/mo
   const sold = rows.filter((m) => m.type === "sale").reduce((s, m) => s + -num(m.quantity) * num(m.unit_price), 0);
   const received = rows.filter((m) => m.type === "receive").reduce((s, m) => s + num(m.quantity) * num(m.unit_cost), 0);
 
-  const csv = {
+  const fullCsv = {
     head: ["Date", "Type", "Product", "SKU", "Store", "Quantity", "Unit cost", "Unit price", "Reference", "Reason", "Note", "Other store", "By"],
     rows: rows.map((m) => {
       const p = productById.get(m.product_id);
@@ -69,18 +69,34 @@ export default async function MovementsPage({ searchParams }: PageProps<"/app/mo
       ];
     }),
   };
+  // Salespeople don't see cost prices.
+  const costCol = fullCsv.head.indexOf("Unit cost");
+  const csv = ctx.isSales
+    ? { head: fullCsv.head.filter((_, i) => i !== costCol), rows: fullCsv.rows.map((r) => r.filter((_, i) => i !== costCol)) }
+    : fullCsv;
 
   return (
     <>
-      <PageHeader
-        title="Stock history"
-        description={
-          <>
-            Every item in and out, with who did it. In this view: <span className="font-semibold text-ink">{money(sold, cur)}</span> sold,{" "}
-            <span className="font-semibold text-ink">{money(received, cur)}</span> received.
-          </>
-        }
-      />
+      {ctx.isSales ? (
+        <PageHeader
+          title="My sales"
+          description={
+            <>
+              Every sale you&rsquo;ve recorded. In this view: <span className="font-semibold text-ink">{money(sold, cur)}</span> sold.
+            </>
+          }
+        />
+      ) : (
+        <PageHeader
+          title="Stock history"
+          description={
+            <>
+              Every item in and out, with who did it. In this view: <span className="font-semibold text-ink">{money(sold, cur)}</span> sold,{" "}
+              <span className="font-semibold text-ink">{money(received, cur)}</span> received.
+            </>
+          }
+        />
+      )}
       <Suspense>
         <MovementFilters stores={ctx.stores} csv={csv} />
       </Suspense>

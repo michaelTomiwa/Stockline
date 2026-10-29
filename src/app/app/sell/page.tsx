@@ -10,7 +10,13 @@ export default async function SellPage() {
   return (
     <>
       <PageHeader title="Sell" description="Record a sale. Stock comes off the shelf as soon as you complete it." />
-      <StockForm mode="sell" {...props} />
+      <StockForm
+        mode="sell"
+        {...props}
+        lockPrices={ctx.isSales}
+        seller={ctx.member.full_name || undefined}
+        businessName={ctx.business.name}
+      />
     </>
   );
 }

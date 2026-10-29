@@ -1,4 +1,25 @@
-export type Role = "owner" | "manager" | "staff";
+export type Role = "owner" | "manager" | "staff" | "sales";
+
+export const ROLE_LABEL: Record<Role, string> = { owner: "Owner", manager: "Manager", staff: "Staff", sales: "Salesperson" };
+
+export type Member = {
+  user_id: string;
+  business_id: string;
+  role: Role;
+  store_id: string | null;
+  full_name: string | null;
+  email: string | null;
+  username: string | null;
+  phone: string | null;
+  active: boolean;
+  monthly_target: number | null;
+  commission_rate: number;
+  created_at: string;
+};
+
+/* Salespeople sign in with a username; Supabase needs an email, so this is it. */
+export const STAFF_EMAIL_DOMAIN = "staff.stockline.invalid";
+export const staffEmail = (username: string) => `${username.trim().toLowerCase()}@${STAFF_EMAIL_DOMAIN}`;
 
 export type Store = { id: string; name: string; address: string | null; phone: string | null; color: string; archived: boolean };
 

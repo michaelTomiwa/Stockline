@@ -3,7 +3,7 @@ import type { Context } from "./context";
 import { num, stockStatus, type Category, type Product, type StockStatus, type Store, type Supplier } from "./types";
 
 /* Supabase returns at most 1,000 rows per request; read in pages so big catalogues aren't cut short. */
-async function readAll<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>) {
+export async function readAll<T>(page: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>) {
   const out: T[] = [];
   for (let from = 0; ; from += 1000) {
     const { data, error } = await page(from, from + 999);

@@ -1,5 +1,5 @@
 import { Mail, MessageCircle, Phone } from "lucide-react";
-import { getContext } from "@/lib/context";
+import { getStockContext } from "@/lib/context";
 import { loadCatalog } from "@/lib/inventory";
 import { num } from "@/lib/types";
 import { fullDate, money } from "@/lib/format";
@@ -16,7 +16,7 @@ function whatsapp(phone: string) {
 }
 
 export default async function SuppliersPage() {
-  const ctx = await getContext();
+  const ctx = await getStockContext();
   const cur = ctx.business.currency;
   const [{ products, suppliers }, { data: deliveries }] = await Promise.all([
     loadCatalog(ctx),

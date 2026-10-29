@@ -1,4 +1,6 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
+import { BadgeCheck, ChevronRight } from "lucide-react";
 import { getContext } from "@/lib/context";
 import { fullDate } from "@/lib/format";
 import { Card, PageHeader, StoreDot } from "@/components/ui";
@@ -10,6 +12,7 @@ const roleHelp = {
   owner: "Sees every store and changes everything.",
   manager: "Runs their store(s): products, deliveries, counts and adjustments.",
   staff: "Sells, receives and transfers at their store.",
+  salesperson: "Only sells, at your prices, and sees only their own sales. Signs in with a username you create.",
 };
 
 export default async function TeamPage() {
@@ -20,15 +23,18 @@ export default async function TeamPage() {
     ctx.supabase.from("invites").select("*").is("accepted_at", null).order("created_at", { ascending: false }),
   ]);
   const storeName = (id: string | null) => (id ? ctx.stores.find((s) => s.id === id) : null);
+  // Salespeople have their own page.
+  const team = (members ?? []).filter((m) => m.role !== "sales");
+  const salesCount = (members ?? []).length - team.length;
 
   return (
     <>
       <PageHeader title="Team" description="Invite managers and staff, and choose which store each person works in." />
       <div className="grid gap-6 lg:grid-cols-[1.5fr_1fr]">
         <div className="space-y-6">
-          <Card title={`People (${(members ?? []).length})`}>
+          <Card title={`People (${team.length})`}>
             <ul className="divide-y divide-line">
-              {(members ?? []).map((m) => {
+              {team.map((m) => {
                 const st = storeName(m.store_id);
                 return (
                   <li key={m.user_id} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
@@ -77,6 +83,16 @@ export default async function TeamPage() {
           )}
         </div>
         <div className="space-y-6">
+          <Link href="/app/salespeople" className="group flex items-center gap-4 rounded-2xl border border-line bg-panel p-5 transition hover:border-pine/40">
+            <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-citrus text-night">
+              <BadgeCheck size={20} />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block font-semibold">Salespeople ({salesCount})</span>
+              <span className="block text-sm text-muted">Create logins for the people who sell, with targets and commission.</span>
+            </span>
+            <ChevronRight size={18} className="text-faint transition group-hover:translate-x-0.5" />
+          </Link>
           <Card title="Invite someone">
             <InviteForm businessId={ctx.business.id} stores={ctx.stores} />
           </Card>

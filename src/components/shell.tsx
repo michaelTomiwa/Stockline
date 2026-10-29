@@ -4,11 +4,11 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, useTransition, type ReactNode } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Check, ChevronsUpDown, LogOut, Menu, Search, X } from "lucide-react";
+import { Check, ChevronsUpDown, LogOut, Menu, Search, ShieldCheck, X } from "lucide-react";
 import { visibleNav } from "./nav";
 import { setActiveStore } from "@/app/app/actions";
 import { cn } from "@/lib/format";
-import type { Role, Store } from "@/lib/types";
+import { ROLE_LABEL, type Role, type Store } from "@/lib/types";
 import { CommandPalette } from "./command-palette";
 
 type ShellProps = {
@@ -18,6 +18,7 @@ type ShellProps = {
   role: Role;
   stores: Store[];
   activeStore: string;
+  isAdmin?: boolean; // Stockline platform admin
 };
 
 export function Logo({ className }: { className?: string }) {
@@ -33,7 +34,7 @@ export function Logo({ className }: { className?: string }) {
   );
 }
 
-function Sidebar({ role, stores, business, person, onNavigate }: Omit<ShellProps, "children" | "activeStore"> & { onNavigate?: () => void }) {
+function Sidebar({ role, stores, business, person, isAdmin, onNavigate }: Omit<ShellProps, "children" | "activeStore"> & { onNavigate?: () => void }) {
   const path = usePathname();
   const groups = visibleNav(role, stores.length);
   return (
@@ -79,7 +80,12 @@ function Sidebar({ role, stores, business, person, onNavigate }: Omit<ShellProps
       </nav>
       <div className="border-t border-white/10 px-5 py-4">
         <p className="truncate text-sm font-medium text-white">{person}</p>
-        <p className="text-xs capitalize text-white/50">{role}</p>
+        <p className="text-xs text-white/50">{ROLE_LABEL[role]}</p>
+        {isAdmin && (
+          <Link href="/admin" onClick={onNavigate} className="mt-3 flex items-center gap-2 text-sm text-citrus hover:text-white">
+            <ShieldCheck size={15} /> Stockline admin
+          </Link>
+        )}
         <form action="/auth/signout" method="post" className="mt-3">
           <button className="flex items-center gap-2 text-sm text-white/60 hover:text-white">
             <LogOut size={15} /> Sign out

@@ -16,8 +16,13 @@ One owner, several stores. Track what comes in, what sells, what moves between s
 | **Suppliers** | Contacts, products supplied, spend in the last 90 days, call / WhatsApp / email |
 | **Stock history** | Every movement, filterable by type, store, period and product, with who did it; CSV export |
 | **Reports** | Revenue and profit by day, stores compared, stock value by category, busiest hours heatmap, best sellers, slow movers |
+| **Salespeople** | Create logins (username + password, no email) for the people who sell; monthly targets, commission, leaderboard, reset passwords, turn accounts off; send the login on WhatsApp |
 | **Team** | Invite managers and staff by email and assign them to a store |
 | **Settings** | Business name and currency; load sample data on a fresh account |
+
+After each sale there's a receipt to print or send to the customer on WhatsApp.
+
+The **admin area** at `/admin` shows every business on the platform: owners, stores, people, stock value, sales and recent activity. Only emails listed in `platform_admins` can open it.
 
 Press **⌘K / Ctrl+K** anywhere to jump to a page or search products.
 
@@ -26,6 +31,7 @@ Press **⌘K / Ctrl+K** anywhere to jump to a page or search products.
 - **Owner** — every store, everything.
 - **Manager** — their store(s): products, suppliers, deliveries, counts and adjustments.
 - **Staff** — sell, receive and transfer at their store.
+- **Salesperson** — only sells, always at the listed price, and only sees their own sales. Signs in with a username the owner or their store manager created.
 
 Enforced in the database with row-level security, not just hidden in the UI.
 
@@ -41,4 +47,8 @@ npm install
 npm run dev
 ```
 
-Run `supabase/migrations/0001_inventory.sql` and `0002_demo_data.sql` on a Supabase project.
+Run the files in `supabase/migrations/` in order on a Supabase project. Then make yourself an admin:
+
+```sql
+insert into public.platform_admins (email) values ('you@example.com');
+```

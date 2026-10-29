@@ -59,12 +59,19 @@ export default async function ProductPage({ params }: PageProps<"/app/products/[
         )}
       </FadeIn>
 
-      <FadeIn delay={0.05} className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line lg:grid-cols-4">
+      <FadeIn delay={0.05} className={cn("grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line", ctx.isSales ? "lg:grid-cols-3" : "lg:grid-cols-4")}>
         {[
           { label: "On hand", value: `${qty(total)} ${product.unit}`, sub: `Reorder at ${qty(product.reorder_level)} per store` },
-          { label: "Stock value", value: money(total * product.cost_price, cur), sub: `${money(total * product.sell_price, cur)} at selling price` },
-          { label: "Price", value: money(product.sell_price, cur), sub: `Cost ${money(product.cost_price, cur)} · ${margin}% margin` },
-          { label: "Sold, 30 days", value: `${qty(num(sold?.units))} ${product.unit}`, sub: money(num(sold?.revenue), cur) },
+          ...(ctx.isSales
+            ? [
+                { label: "Price", value: money(product.sell_price, cur), sub: `per ${product.unit}` },
+                { label: "You sold, 30 days", value: `${qty(num(sold?.units))} ${product.unit}`, sub: money(num(sold?.revenue), cur) },
+              ]
+            : [
+                { label: "Stock value", value: money(total * product.cost_price, cur), sub: `${money(total * product.sell_price, cur)} at selling price` },
+                { label: "Price", value: money(product.sell_price, cur), sub: `Cost ${money(product.cost_price, cur)} · ${margin}% margin` },
+                { label: "Sold, 30 days", value: `${qty(num(sold?.units))} ${product.unit}`, sub: money(num(sold?.revenue), cur) },
+              ]),
         ].map((s) => (
           <div key={s.label} className="bg-panel p-4 sm:p-5">
             <p className="text-sm text-muted">{s.label}</p>

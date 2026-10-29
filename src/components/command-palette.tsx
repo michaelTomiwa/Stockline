@@ -43,7 +43,7 @@ export function CommandPalette({ role, storeCount }: { role: Role; storeCount: n
       g.items.map((i) => ({ label: i.label, hint: g.group || "Page", href: i.href })),
     );
     const extra = [
-      { label: "Add a product", hint: "Action", href: "/app/products?new=1" },
+      ...(role === "owner" || role === "manager" ? [{ label: "Add a product", hint: "Action", href: "/app/products?new=1" }] : []),
       { label: "Low stock", hint: "Products", href: "/app/products?status=low" },
       { label: "Out of stock", hint: "Products", href: "/app/products?status=out" },
     ];

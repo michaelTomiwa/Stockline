@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { MailCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/browser";
+import { staffEmail } from "@/lib/types";
 import { Button, ErrorNote, Field } from "../ui-client";
 
 export function SignupForm() {
@@ -80,13 +81,19 @@ export function LoginForm({ next }: { next: string }) {
     const f = new FormData(e.currentTarget);
     setBusy(true);
     setError(null);
+    // Salespeople sign in with the username the owner gave them.
+    const login = String(f.get("email")).trim();
+    const isUsername = !login.includes("@");
     const { error } = await createClient().auth.signInWithPassword({
-      email: String(f.get("email")).trim(),
+      email: isUsername ? staffEmail(login) : login,
       password: String(f.get("password")),
     });
     if (error) {
       setBusy(false);
-      return setError(error.message === "Invalid login credentials" ? "That email and password don't match." : error.message);
+      if (error.message === "Invalid login credentials")
+        return setError(isUsername ? "That username and password don't match. Ask your manager if you've forgotten them." : "That email and password don't match.");
+      if (/banned/i.test(error.message)) return setError("This account has been turned off. Ask your manager to turn it back on.");
+      return setError(error.message);
     }
     router.push(next);
     router.refresh();
@@ -95,6 +102,7 @@ export function LoginForm({ next }: { next: string }) {
   async function forgot(form: HTMLFormElement | null) {
     const email = String(new FormData(form ?? undefined).get("email") ?? "").trim();
     if (!email) return setError("Type your email first, then choose “Forgot password?”.");
+    if (!email.includes("@")) return setError("Salespeople: ask your manager to reset your password on the Salespeople page.");
     setError(null);
     const { error } = await createClient().auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth/callback?next=/reset-password`,
@@ -105,7 +113,7 @@ export function LoginForm({ next }: { next: string }) {
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <Field label="Email" name="email" type="email" autoComplete="email" required />
+      <Field label="Email or username" name="email" autoComplete="username" autoCapitalize="none" spellCheck={false} required hint="Salespeople: use the username your manager gave you." />
       <Field label="Password" name="password" type="password" autoComplete="current-password" required />
       <button type="button" onClick={(e) => forgot(e.currentTarget.form)} className="text-sm font-medium text-pine hover:underline">
         Forgot password?

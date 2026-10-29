@@ -7,7 +7,7 @@ import { compactMoney, money, shortDate } from "@/lib/format";
 export type DayPoint = { day: string; revenue: number; profit: number; orders: number };
 
 /* Daily revenue bars with profit as the darker inner bar. Hover or tap a day for details. */
-export function RevenueChart({ data, currency }: { data: DayPoint[]; currency: string }) {
+export function RevenueChart({ data, currency, showProfit = true }: { data: DayPoint[]; currency: string; showProfit?: boolean }) {
   const [hover, setHover] = useState<number | null>(null);
   const W = 720;
   const H = 220;
@@ -28,10 +28,17 @@ export function RevenueChart({ data, currency }: { data: DayPoint[]; currency: s
           <p className="text-sm text-muted">{hover === null ? `Sales, last ${data.length} days` : shortDate(point.day)}</p>
           <p className="text-2xl font-bold tnum">{money(hover === null ? totalRev : point?.revenue ?? 0, currency)}</p>
         </div>
-        <div className="text-right text-sm">
-          <p className="text-muted">Profit</p>
-          <p className="font-semibold text-ok tnum">{money(hover === null ? totalProfit : point?.profit ?? 0, currency)}</p>
-        </div>
+        {showProfit ? (
+          <div className="text-right text-sm">
+            <p className="text-muted">Profit</p>
+            <p className="font-semibold text-ok tnum">{money(hover === null ? totalProfit : point?.profit ?? 0, currency)}</p>
+          </div>
+        ) : (
+          <div className="text-right text-sm">
+            <p className="text-muted">Sales</p>
+            <p className="font-semibold tnum">{hover === null ? data.reduce((s, d) => s + d.orders, 0) : point?.orders ?? 0}</p>
+          </div>
+        )}
       </div>
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" role="img" aria-label="Sales by day" onPointerLeave={() => setHover(null)}>
         {[0, 0.5, 1].map((t) => (
@@ -59,16 +66,18 @@ export function RevenueChart({ data, currency }: { data: DayPoint[]; currency: s
                 animate={{ y: y(d.revenue), height: y(0) - y(d.revenue) }}
                 transition={{ duration: 0.6, delay: i * 0.012, ease: [0.22, 1, 0.36, 1] }}
               />
-              <motion.rect
-                x={x}
-                width={w}
-                rx={Math.min(3, w / 3)}
-                fill="#d6f26b"
-                opacity={dim ? 0.4 : 1}
-                initial={{ y: y(0), height: 0 }}
-                animate={{ y: y(Math.max(0, d.profit)), height: y(0) - y(Math.max(0, d.profit)) }}
-                transition={{ duration: 0.6, delay: 0.15 + i * 0.012, ease: [0.22, 1, 0.36, 1] }}
-              />
+              {showProfit && (
+                <motion.rect
+                  x={x}
+                  width={w}
+                  rx={Math.min(3, w / 3)}
+                  fill="#d6f26b"
+                  opacity={dim ? 0.4 : 1}
+                  initial={{ y: y(0), height: 0 }}
+                  animate={{ y: y(Math.max(0, d.profit)), height: y(0) - y(Math.max(0, d.profit)) }}
+                  transition={{ duration: 0.6, delay: 0.15 + i * 0.012, ease: [0.22, 1, 0.36, 1] }}
+                />
+              )}
               {(i === 0 || i === data.length - 1 || (i % 7 === 0 && data.length - 1 - i >= 4)) && (
                 <text x={x + w / 2} y={H - 6} textAnchor="middle" fontSize="11" fill="#8b948e">
                   {shortDate(d.day)}
@@ -82,9 +91,11 @@ export function RevenueChart({ data, currency }: { data: DayPoint[]; currency: s
         <span className="flex items-center gap-1.5">
           <span className="size-2.5 rounded-sm bg-pine" /> Revenue
         </span>
-        <span className="flex items-center gap-1.5">
-          <span className="size-2.5 rounded-sm bg-citrus" /> Profit
-        </span>
+        {showProfit && (
+          <span className="flex items-center gap-1.5">
+            <span className="size-2.5 rounded-sm bg-citrus" /> Profit
+          </span>
+        )}
       </div>
     </div>
   );

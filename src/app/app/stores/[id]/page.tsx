@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ChevronLeft } from "lucide-react";
-import { getContext } from "@/lib/context";
+import { getStockContext } from "@/lib/context";
 import { loadCatalog, loadLevels, stockGrid, suggestedOrder, totals } from "@/lib/inventory";
 import { loadPeople } from "@/lib/people";
 import { num, type Movement } from "@/lib/types";
@@ -13,7 +13,7 @@ import { FadeIn } from "@/components/motion";
 
 export default async function StorePage({ params }: PageProps<"/app/stores/[id]">) {
   const { id } = await params;
-  const ctx = await getContext();
+  const ctx = await getStockContext();
   const store = ctx.stores.find((s) => s.id === id);
   if (!store) notFound();
   const cur = ctx.business.currency;

@@ -24,6 +24,7 @@ export function ProductsView({
   businessId,
   currency,
   canManage,
+  showCost = true,
 }: {
   rows: ProductRow[];
   stores: Store[];
@@ -32,6 +33,7 @@ export function ProductsView({
   businessId: string;
   currency: string;
   canManage: boolean;
+  showCost?: boolean;
 }) {
   const params = useSearchParams();
   const router = useRouter();
@@ -69,14 +71,14 @@ export function ProductsView({
   function exportCsv() {
     downloadCsv(
       "products.csv",
-      ["Name", "SKU", "Barcode", "Category", "Unit", "Cost", "Price", "Reorder at", ...stores.map((s) => s.name), "Total"],
+      ["Name", "SKU", "Barcode", "Category", "Unit", ...(showCost ? ["Cost"] : []), "Price", "Reorder at", ...stores.map((s) => s.name), "Total"],
       shown.map((r) => [
         r.name,
         r.sku,
         r.barcode ?? "",
         catName.get(r.category_id ?? "") ?? "",
         r.unit,
-        r.cost_price,
+        ...(showCost ? [r.cost_price] : []),
         r.sell_price,
         r.reorder_level,
         ...stores.map((s) => r.perStore[s.id] ?? 0),

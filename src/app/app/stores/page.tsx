@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { MapPin, Phone } from "lucide-react";
-import { getContext } from "@/lib/context";
+import { getStockContext } from "@/lib/context";
 import { loadCatalog, loadLevels, stockGrid, totals } from "@/lib/inventory";
 import { num } from "@/lib/types";
 import { money } from "@/lib/format";
@@ -12,7 +12,7 @@ import { Stagger, StaggerItem } from "@/components/motion";
 export const metadata = { title: "Stores" };
 
 export default async function StoresPage() {
-  const ctx = await getContext();
+  const ctx = await getStockContext();
   const cur = ctx.business.currency;
   const [{ products }, levels, salesRes] = await Promise.all([
     loadCatalog(ctx),

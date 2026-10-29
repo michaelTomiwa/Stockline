@@ -1,8 +1,14 @@
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
-/* Keeps the Supabase session fresh; /app needs a signed-in person. */
+/* Addresses left over from the old Elite referral site; they no longer serve anything. */
+const RETIRED_HOSTS = new Set(["elite-referral.vercel.app", "elite-research-partners.vercel.app"]);
+
+/* Keeps the Supabase session fresh; /app and /admin need a signed-in person. */
 export async function proxy(request: NextRequest) {
+  if (RETIRED_HOSTS.has(request.headers.get("host") ?? "")) {
+    return new NextResponse("Not found", { status: 404, headers: { "content-type": "text/plain" } });
+  }
   let response = NextResponse.next({ request });
 
   const supabase = createServerClient(
@@ -27,13 +33,15 @@ export async function proxy(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const path = request.nextUrl.pathname;
-  if (path.startsWith("/app") && !user) {
+  if ((path.startsWith("/app") || path.startsWith("/admin")) && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = `?next=${encodeURIComponent(path)}`;
     return NextResponse.redirect(url);
   }
-  if ((path === "/login" || path === "/signup" || path === "/") && user) {
+  // An error on /login means the account can't use /app (e.g. turned off); let them sign in as someone else.
+  const loginError = path === "/login" && request.nextUrl.searchParams.has("error");
+  if ((path === "/login" || path === "/signup" || path === "/") && user && !loginError) {
     const url = request.nextUrl.clone();
     url.pathname = "/app";
     url.search = "";

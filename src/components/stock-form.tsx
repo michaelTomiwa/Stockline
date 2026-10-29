@@ -4,11 +4,11 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, CircleCheck, Minus, Plus, Search, Trash2 } from "lucide-react";
+import { ArrowRight, CircleCheck, MessageCircle, Minus, Plus, Printer, Search, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/browser";
 import type { Category, Product, Store, Supplier } from "@/lib/types";
 import { stockStatus } from "@/lib/types";
-import { cn, money, qty } from "@/lib/format";
+import { cn, dateTime, money, qty } from "@/lib/format";
 import { Button, ErrorNote, SelectField, friendlyError, inputClass } from "./ui-client";
 import { StoreDot } from "./ui";
 import { ScanButton } from "./scan-button";
@@ -34,6 +34,9 @@ export function StockForm({
   levels,
   defaultStore,
   currency,
+  lockPrices = false,
+  seller,
+  businessName,
 }: {
   mode: Mode;
   products: Product[];
@@ -45,6 +48,9 @@ export function StockForm({
   levels: Record<string, number>; // `${store}:${product}` → quantity
   defaultStore: string;
   currency: string;
+  lockPrices?: boolean; // salespeople sell at the listed price
+  seller?: string; // shown on receipts
+  businessName?: string;
 }) {
   const router = useRouter();
   const [store, setStore] = useState(defaultStore);
@@ -59,7 +65,7 @@ export function StockForm({
   const [reason, setReason] = useState("Stock count");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ lines: Line[]; total: number } | null>(null);
+  const [done, setDone] = useState<{ lines: Line[]; total: number; at: string; storeName: string; reference: string } | null>(null);
   const search = useRef<HTMLInputElement>(null);
 
   const have = useCallback((productId: string, storeId = store) => levels[`${storeId}:${productId}`] ?? 0, [levels, store]);
@@ -136,7 +142,7 @@ export function StockForm({
             });
     setBusy(false);
     if (error) return setError(friendlyError(error.message));
-    setDone({ lines, total });
+    setDone({ lines, total, at: new Date().toISOString(), storeName: stores.find((x) => x.id === store)?.name ?? "", reference });
     setLines([]);
     setReference("");
     setNote("");
@@ -159,7 +165,8 @@ export function StockForm({
           {done.lines.length} {done.lines.length === 1 ? "product" : "products"}
           {mode !== "count" && <> · {money(done.total, currency)}</>}
         </p>
-        <div className="mt-6 flex justify-center gap-2">
+        {mode === "sell" && <Receipt done={done} currency={currency} seller={seller} businessName={businessName} />}
+        <div className="no-print mt-6 flex flex-wrap justify-center gap-2">
           <Button onClick={() => { setDone(null); setTimeout(() => search.current?.focus(), 0); }}>
             {mode === "sell" ? "New sale" : "Start another"}
           </Button>
@@ -341,7 +348,10 @@ export function StockForm({
                             <Plus size={14} />
                           </button>
                         </div>
-                        {(mode === "sell" || mode === "receive") && (
+                        {mode === "sell" && lockPrices && (
+                          <span className="text-xs text-muted tnum">@ {money(l.price, currency)}</span>
+                        )}
+                        {((mode === "sell" && !lockPrices) || mode === "receive") && (
                           <label className="flex items-center gap-1 text-xs text-muted">
                             @
                             <input
@@ -405,6 +415,74 @@ export function StockForm({
             </Button>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* What the customer gets: printable, or sent straight to their WhatsApp. */
+function Receipt({
+  done,
+  currency,
+  seller,
+  businessName,
+}: {
+  done: { lines: Line[]; total: number; at: string; storeName: string; reference: string };
+  currency: string;
+  seller?: string;
+  businessName?: string;
+}) {
+  const [phone, setPhone] = useState("");
+  const text = [
+    `*${businessName ?? "Receipt"}*${done.storeName ? ` · ${done.storeName}` : ""}`,
+    dateTime(done.at),
+    "",
+    ...done.lines.map((l) => `${qty(l.quantity)} × ${l.product.name}  ${money(l.quantity * l.price, currency)}`),
+    "",
+    `*Total: ${money(done.total, currency)}*`,
+    ...(done.reference ? [`Ref: ${done.reference}`] : []),
+    ...(seller ? [`Served by ${seller}`] : []),
+    "Thank you for shopping with us!",
+  ].join("\n");
+  // wa.me wants the number in international form without "+" (0803… → 234803…).
+  const digits = phone.replace(/\D/g, "");
+  const intl = digits.startsWith("0") ? `234${digits.slice(1)}` : digits;
+  const wa = `https://wa.me/${intl}?text=${encodeURIComponent(text)}`;
+
+  return (
+    <div className="mt-6 text-left">
+      <div className="rounded-xl border border-dashed border-line bg-sunk/60 p-4 font-mono text-[13px] leading-relaxed">
+        <p className="font-semibold">{businessName}{done.storeName && ` · ${done.storeName}`}</p>
+        <p className="text-faint">{dateTime(done.at)}</p>
+        <ul className="my-3 space-y-0.5">
+          {done.lines.map((l) => (
+            <li key={l.product.id} className="flex justify-between gap-3">
+              <span className="truncate">{qty(l.quantity)} × {l.product.name}</span>
+              <span className="tnum">{money(l.quantity * l.price, currency)}</span>
+            </li>
+          ))}
+        </ul>
+        <p className="flex justify-between border-t border-line pt-2 font-semibold">
+          <span>Total</span>
+          <span className="tnum">{money(done.total, currency)}</span>
+        </p>
+        {seller && <p className="mt-2 text-faint">Served by {seller}</p>}
+      </div>
+      <div className="no-print mt-3 flex gap-2">
+        <input
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          inputMode="tel"
+          placeholder="Customer's number"
+          className={cn(inputClass, "flex-1")}
+          aria-label="Customer's WhatsApp number"
+        />
+        <a href={wa} target="_blank" rel="noreferrer" className="inline-flex h-10 shrink-0 items-center gap-2 rounded-xl bg-[#25D366] px-3 text-sm font-semibold text-white hover:brightness-95">
+          <MessageCircle size={16} /> Send
+        </a>
+        <button onClick={() => window.print()} className="inline-flex h-10 shrink-0 items-center rounded-xl border border-line px-3 hover:bg-sunk" aria-label="Print receipt">
+          <Printer size={16} />
+        </button>
       </div>
     </div>
   );

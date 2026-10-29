@@ -1,7 +1,7 @@
 import "server-only";
 import { cache } from "react";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { createClient } from "./supabase/server";
 import type { Role, Store } from "./types";
 
@@ -45,10 +45,18 @@ export const getContext = cache(async () => {
     activeStore,
     canManage: role === "owner" || role === "manager",
     isOwner: role === "owner",
+    isSales: role === "sales",
   };
 });
 
 export type Context = Awaited<ReturnType<typeof getContext>>;
+
+/* Salespeople only sell and look things up; other pages 404 for them. */
+export async function getStockContext() {
+  const ctx = await getContext();
+  if (ctx.isSales) notFound();
+  return ctx;
+}
 
 /* Pages that change stock need one specific store. */
 export function operatingStore(ctx: Context) {

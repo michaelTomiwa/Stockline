@@ -38,6 +38,7 @@ export default async function ProductsPage() {
           businessId={ctx.business.id}
           currency={ctx.business.currency}
           canManage={ctx.canManage}
+          showCost={!ctx.isSales}
         />
       </Suspense>
     </>

@@ -10,7 +10,7 @@ import { cn } from "@/lib/format";
 
 const COLORS = ["#1F5F4A", "#3A6EA5", "#B7791F", "#8B3A62", "#2F855A", "#C2410C", "#5B5BD6", "#0E7490"];
 
-export function StoreButton({ store, businessId }: { store?: Store; businessId: string }) {
+export function StoreButton({ store, businessId, compact }: { store?: Store; businessId: string; compact?: boolean }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -48,7 +48,18 @@ export function StoreButton({ store, businessId }: { store?: Store; businessId: 
 
   return (
     <>
-      {store ? (
+      {store && compact ? (
+        <button
+          onClick={(e) => {
+            e.preventDefault();
+            setOpen(true);
+          }}
+          className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-line bg-panel/90 px-2.5 text-xs font-semibold text-muted backdrop-blur hover:border-pine/40 hover:text-ink"
+          aria-label={`Edit ${store.name}`}
+        >
+          <Pencil size={13} /> Edit
+        </button>
+      ) : store ? (
         <Button variant="secondary" onClick={() => setOpen(true)}>
           <Pencil size={15} /> Edit store
         </Button>
@@ -60,7 +71,7 @@ export function StoreButton({ store, businessId }: { store?: Store; businessId: 
       <Drawer open={open} onClose={() => setOpen(false)} title={store ? "Edit store" : "Add a store"}>
         <form onSubmit={submit} className="space-y-4">
           <Field label="Store name" name="name" defaultValue={store?.name} required placeholder="e.g. Ikeja" />
-          <Field label="Address" name="address" defaultValue={store?.address ?? ""} />
+          <Field label="Address / location" name="address" defaultValue={store?.address ?? ""} placeholder="e.g. Jogbo Street, Jebode" />
           <Field label="Phone" name="phone" type="tel" defaultValue={store?.phone ?? ""} />
           <div>
             <span className="mb-1.5 block text-sm font-medium text-muted">Colour</span>

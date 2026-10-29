@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowDownUp, Download, Plus, Search } from "lucide-react";
+import { ArrowDownUp, Download, Pencil, Plus, Search } from "lucide-react";
+import { createClient } from "@/lib/supabase/browser";
 import type { Category, Product, StockStatus, Store, Supplier } from "@/lib/types";
 import { stockStatus } from "@/lib/types";
 import { cn, money, qty } from "@/lib/format";
@@ -194,7 +195,9 @@ export function ProductsView({
                   <td className={cn(td, "text-right font-semibold tnum")}>
                     {qty(r.total)} <span className="font-normal text-faint">{r.unit}</span>
                   </td>
-                  <td className={cn(td, "text-right tnum")}>{money(r.sell_price, currency)}</td>
+                  <td className={cn(td, "text-right tnum")}>
+                    {canManage ? <PriceCell id={r.id} price={r.sell_price} currency={currency} /> : money(r.sell_price, currency)}
+                  </td>
                   <td className={td}>
                     <StatusBadge status={r.status} />
                   </td>
@@ -223,5 +226,60 @@ export function ProductsView({
         )}
       </Drawer>
     </>
+  );
+}
+
+/* Click a price to change it; Enter saves, Escape cancels. */
+function PriceCell({ id, price, currency }: { id: string; price: number; currency: string }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(String(price));
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+
+  async function save() {
+    const next = Number(value);
+    if (!Number.isFinite(next) || next < 0 || next === price) return setEditing(false);
+    setBusy(true);
+    const { error } = await createClient().from("products").update({ sell_price: next }).eq("id", id);
+    setBusy(false);
+    if (error) return setFailed(true);
+    setEditing(false);
+    router.refresh();
+  }
+
+  if (!editing) {
+    return (
+      <button
+        onClick={() => {
+          setValue(String(price));
+          setFailed(false);
+          setEditing(true);
+        }}
+        className="group inline-flex items-center gap-1.5 rounded-lg px-1.5 py-0.5 hover:bg-sunk"
+        title="Change price"
+      >
+        <Pencil size={12} className="text-faint opacity-0 transition group-hover:opacity-100" />
+        {money(price, currency)}
+      </button>
+    );
+  }
+  return (
+    <input
+      autoFocus
+      type="number"
+      min={0}
+      step="any"
+      value={value}
+      disabled={busy}
+      onChange={(e) => setValue(e.target.value)}
+      onBlur={save}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") save();
+        if (e.key === "Escape") setEditing(false);
+      }}
+      aria-label="New price"
+      className={cn("h-8 w-28 rounded-lg border bg-panel px-2 text-right text-sm tnum outline-none", failed ? "border-out" : "border-pine")}
+    />
   );
 }

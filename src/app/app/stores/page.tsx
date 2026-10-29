@@ -38,11 +38,16 @@ export default async function StoresPage() {
             const t = totals(stockGrid(products, [s], levels));
             const r = sales.get(s.id);
             return (
-              <StaggerItem key={s.id}>
+              <StaggerItem key={s.id} className="relative">
+                {ctx.isOwner && (
+                  <div className="absolute right-3 top-4 z-10">
+                    <StoreButton store={s} businessId={ctx.business.id} compact />
+                  </div>
+                )}
                 <Link href={`/app/stores/${s.id}`} className="group block overflow-hidden rounded-2xl border border-line bg-panel transition hover:-translate-y-0.5 hover:shadow-lg">
                   <div className="h-1.5" style={{ background: s.color }} />
                   <div className="p-5">
-                    <h2 className="text-lg font-bold group-hover:text-pine">{s.name}</h2>
+                    <h2 className="pr-16 text-lg font-bold group-hover:text-pine">{s.name}</h2>
                     {s.address && (
                       <p className="mt-1 flex items-start gap-1.5 text-sm text-muted">
                         <MapPin size={14} className="mt-0.5 shrink-0" /> {s.address}

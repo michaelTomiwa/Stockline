@@ -2,7 +2,8 @@ import { Suspense } from "react";
 import { getContext } from "@/lib/context";
 import { loadCatalog, loadLevels, scopeStoreIds } from "@/lib/inventory";
 import { stockStatus } from "@/lib/types";
-import { PageHeader } from "@/components/ui";
+import { ButtonLink, PageHeader } from "@/components/ui";
+import { Upload } from "lucide-react";
 import { ProductsView, type ProductRow } from "@/components/products-view";
 
 export const metadata = { title: "Products" };
@@ -28,6 +29,13 @@ export default async function ProductsPage() {
       <PageHeader
         title="Products"
         description={`${products.length} products${stores.length === 1 ? ` at ${stores[0].name}` : ` across ${stores.length} stores`}.`}
+        actions={
+          ctx.canManage && (
+            <ButtonLink href="/app/products/import" variant="secondary">
+              <Upload size={16} /> Import from spreadsheet
+            </ButtonLink>
+          )
+        }
       />
       <Suspense>
         <ProductsView

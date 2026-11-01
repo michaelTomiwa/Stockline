@@ -58,11 +58,21 @@ export default async function AdminBusinessPage({ params }: PageProps<"/admin/bu
       <Link href="/admin" className="mb-4 inline-flex items-center gap-1 text-sm text-muted hover:text-ink">
         <ChevronLeft size={16} /> All businesses
       </Link>
-      <FadeIn className="mb-6">
-        <h1 className="text-2xl font-bold tracking-tight sm:text-[28px]">{d.business.name}</h1>
-        <p className="mt-1 text-muted">
-          Owner {d.business.owner_email ?? "unknown"} · joined {fullDate(d.business.created_at)}
-        </p>
+      <FadeIn className="mb-6 flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight sm:text-[28px]">{d.business.name}</h1>
+          <p className="mt-1 text-muted">
+            Owner {d.business.owner_email ?? "unknown"} · joined {fullDate(d.business.created_at)}
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Link href={`/admin/businesses/${d.business.id}/products`} className="inline-flex h-10 items-center rounded-xl border border-line bg-panel px-4 text-sm font-semibold hover:bg-sunk">
+            Products & prices
+          </Link>
+          <Link href={`/admin/businesses/${d.business.id}/products?tab=import`} className="inline-flex h-10 items-center rounded-xl bg-pine px-4 text-sm font-semibold text-white hover:bg-pine-deep">
+            Import products
+          </Link>
+        </div>
       </FadeIn>
 
       <FadeIn delay={0.05} className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line md:grid-cols-3 xl:grid-cols-6">

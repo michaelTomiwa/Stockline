@@ -181,3 +181,162 @@ export function AdminList({ admins }: { admins: { email: string; added_at: strin
     </div>
   );
 }
+
+export type AdminProduct = {
+  id: string;
+  name: string;
+  sku: string;
+  category: string | null;
+  unit: string;
+  cost_price: number;
+  sell_price: number;
+  archived: boolean;
+  stock: Record<string, number>;
+  total: number;
+};
+
+/* A business's catalogue for an admin helping them: search, and edit name, cost and price in place. */
+export function AdminProductTable({
+  rows,
+  stores,
+  currency,
+}: {
+  rows: AdminProduct[];
+  stores: { id: string; name: string; color: string }[];
+  currency: string;
+}) {
+  const [q, setQ] = useState("");
+  const shown = useMemo(() => {
+    const s = q.trim().toLowerCase();
+    return s ? rows.filter((r) => `${r.name} ${r.sku} ${r.category ?? ""}`.toLowerCase().includes(s)) : rows;
+  }, [rows, q]);
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center gap-2 border-b border-line p-3">
+        <label className="relative min-w-56 flex-1">
+          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-faint" />
+          <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search name, SKU or category" className={cn(inputClass, "bg-panel pl-9")} />
+        </label>
+        <span className="text-sm text-muted">
+          {shown.length} of {rows.length}
+        </span>
+      </div>
+      <div className="max-h-[70vh] overflow-auto">
+        <table className="w-full min-w-[820px] text-sm">
+          <thead className="sticky top-0 z-10 bg-sunk">
+            <tr>
+              <th className={th}>Product</th>
+              <th className={th}>Category</th>
+              {stores.map((s) => (
+                <th key={s.id} className={cn(th, "text-right")}>
+                  {s.name}
+                </th>
+              ))}
+              <th className={cn(th, "text-right")}>Cost</th>
+              <th className={cn(th, "text-right")}>Price</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shown.slice(0, 600).map((r) => (
+              <tr key={r.id} className={cn("border-t border-line", r.archived && "opacity-50")}>
+                <td className={td}>
+                  <EditableText id={r.id} field="name" value={r.name} />
+                  <span className="block font-mono text-xs text-faint">{r.sku}</span>
+                </td>
+                <td className={cn(td, "text-muted")}>{r.category ?? "—"}</td>
+                {stores.map((s) => (
+                  <td key={s.id} className={cn(td, "text-right tnum")}>
+                    {Number(r.stock[s.id] ?? 0).toLocaleString("en-NG")}
+                  </td>
+                ))}
+                <td className={cn(td, "text-right")}>
+                  <EditableMoney id={r.id} field="cost" value={r.cost_price} currency={currency} />
+                </td>
+                <td className={cn(td, "text-right font-semibold")}>
+                  <EditableMoney id={r.id} field="price" value={r.sell_price} currency={currency} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {shown.length === 0 && <p className="px-5 py-12 text-center text-muted">{rows.length ? "Nothing matches that search." : "No products yet. Use Import to add them."}</p>}
+      </div>
+    </div>
+  );
+}
+
+async function saveProduct(id: string, field: "name" | "cost" | "price", value: string | number) {
+  return createClient().rpc("admin_update_product", {
+    p_id: id,
+    p_name: field === "name" ? value : null,
+    p_cost: field === "cost" ? value : null,
+    p_price: field === "price" ? value : null,
+  });
+}
+
+function EditableMoney({ id, field, value, currency }: { id: string; field: "cost" | "price"; value: number; currency: string }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [v, setV] = useState(String(value));
+  const [bad, setBad] = useState(false);
+  async function save() {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0 || n === Number(value)) return setEditing(false);
+    const { error } = await saveProduct(id, field, n);
+    if (error) return setBad(true);
+    setEditing(false);
+    router.refresh();
+  }
+  if (!editing)
+    return (
+      <button onClick={() => (setV(String(value)), setBad(false), setEditing(true))} className="rounded-md px-1.5 py-0.5 tnum hover:bg-sunk" title={`Change ${field}`}>
+        {money(Number(value), currency)}
+      </button>
+    );
+  return (
+    <input
+      autoFocus
+      type="number"
+      min={0}
+      step="any"
+      value={v}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={save}
+      onKeyDown={(e) => (e.key === "Enter" ? save() : e.key === "Escape" && setEditing(false))}
+      className={cn("h-8 w-28 rounded-lg border bg-panel px-2 text-right text-sm tnum outline-none", bad ? "border-out" : "border-pine")}
+      aria-label={`New ${field}`}
+    />
+  );
+}
+
+function EditableText({ id, field, value }: { id: string; field: "name"; value: string }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [v, setV] = useState(value);
+  async function save() {
+    if (!v.trim() || v === value) return setEditing(false);
+    const { error } = await saveProduct(id, field, v.trim());
+    if (!error) {
+      setEditing(false);
+      router.refresh();
+    }
+  }
+  if (!editing)
+    return (
+      <button onClick={() => (setV(value), setEditing(true))} className="rounded-md text-left font-medium hover:text-pine" title="Rename">
+        {value}
+      </button>
+    );
+  return (
+    <input
+      autoFocus
+      value={v}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={save}
+      onKeyDown={(e) => (e.key === "Enter" ? save() : e.key === "Escape" && setEditing(false))}
+      className="h-8 w-full rounded-lg border border-pine bg-panel px-2 text-sm outline-none"
+      aria-label="Product name"
+    />
+  );
+}

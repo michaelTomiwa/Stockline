@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { getStockContext } from "@/lib/context";
 import { loadCatalog, loadLevels, scopeStoreIds, stockGrid } from "@/lib/inventory";
-import { num } from "@/lib/types";
+import { num, PAYMENT_LABEL } from "@/lib/types";
 import { cn, money, qty } from "@/lib/format";
 import { Card, PageHeader, td, th } from "@/components/ui";
 import { RevenueChart } from "@/components/charts";
@@ -22,7 +22,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/app/repo
   const storeParam = ctx.activeStore === "all" ? null : ctx.activeStore;
   const since = isoDaysAgo(days);
 
-  const [{ products, categories }, levels, dayRes, prodRes, storeRes, salesRows, personRes, membersRes] = await Promise.all([
+  const [{ products, categories }, levels, dayRes, prodRes, storeRes, salesRows, personRes, membersRes, payRes] = await Promise.all([
     loadCatalog(ctx),
     loadLevels(ctx, storeIds),
     ctx.supabase.rpc("sales_by_day", { p_days: days, p_store: storeParam }),
@@ -37,6 +37,12 @@ export default async function ReportsPage({ searchParams }: PageProps<"/app/repo
       .limit(10000),
     ctx.supabase.rpc("sales_by_person", { p_since: since, p_store: storeParam }),
     ctx.supabase.from("members").select("user_id, full_name, email, role, store_id"),
+    ctx.supabase
+      .from("sale_payments")
+      .select("method, amount")
+      .in("store_id", storeIds.length ? storeIds : ["00000000-0000-0000-0000-000000000000"])
+      .gte("created_at", since)
+      .limit(20000),
   ]);
 
   const byDay = new Map(((dayRes.data ?? []) as { day: string; revenue: unknown; cost: unknown; orders: unknown }[]).map((d) => [d.day, d]));
@@ -49,6 +55,14 @@ export default async function ReportsPage({ searchParams }: PageProps<"/app/repo
   const orders = series.reduce((s, d) => s + d.orders, 0);
 
   const productById = new Map(products.map((p) => [p.id, p]));
+
+  // How customers paid (sales recorded since payment methods were added).
+  const payTotals = new Map<string, number>();
+  for (const p of (payRes.data ?? []) as { method: string; amount: unknown }[]) payTotals.set(p.method, (payTotals.get(p.method) ?? 0) + num(p.amount));
+  const PAY_COLORS: Record<string, string> = { cash: "#2F855A", transfer: "#3A6EA5", pos: "#B7791F", other: "#8B948E" };
+  const payParts = (["cash", "transfer", "pos", "other"] as const)
+    .filter((m) => payTotals.get(m))
+    .map((m) => ({ label: PAYMENT_LABEL[m], value: payTotals.get(m)!, color: PAY_COLORS[m] }));
 
   // Who rang up the sales in this period.
   const memberById = new Map(
@@ -174,6 +188,15 @@ export default async function ReportsPage({ searchParams }: PageProps<"/app/repo
             </Card>
           </Reveal>
         )}
+        {payParts.length > 0 && (
+          <Reveal delay={0.05}>
+            <Card title="How customers paid" className="h-full">
+              <div className="p-5">
+                <Donut parts={payParts} currency={cur} />
+              </div>
+            </Card>
+          </Reveal>
+        )}
         <Reveal delay={0.05}>
           <Card title="Where your stock value sits" className="h-full">
             <div className="p-5">
@@ -190,7 +213,7 @@ export default async function ReportsPage({ searchParams }: PageProps<"/app/repo
           </Card>
         </Reveal>
         {/* Full width when it would otherwise sit alone on the last row. */}
-        <Reveal delay={0.05} className={((storeRows.length > 1 && ctx.activeStore === "all" ? 1 : 0) + (personRows.length > 1 ? 1 : 0)) % 2 === 1 ? "lg:col-span-2" : undefined}>
+        <Reveal delay={0.05} className={((storeRows.length > 1 && ctx.activeStore === "all" ? 1 : 0) + (personRows.length > 1 ? 1 : 0) + (payParts.length > 0 ? 1 : 0)) % 2 === 1 ? "lg:col-span-2" : undefined}>
           <Card title="Slow movers" className="h-full">
             <ul className="divide-y divide-line">
               {slow.map((r) => (

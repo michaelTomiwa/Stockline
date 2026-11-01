@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Archive, Pencil } from "lucide-react";
+import { Archive, Layers, Pencil } from "lucide-react";
 import { createClient } from "@/lib/supabase/browser";
 import type { Category, Product, Supplier } from "@/lib/types";
 import { Button, Drawer } from "./ui-client";
@@ -21,6 +21,7 @@ export function ProductActions({
 }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [variants, setVariants] = useState(false);
   const [busy, setBusy] = useState(false);
 
   async function archive() {
@@ -33,6 +34,9 @@ export function ProductActions({
 
   return (
     <>
+      <Button variant="secondary" onClick={() => setVariants(true)}>
+        <Layers size={15} /> Add sizes / colours
+      </Button>
       <Button variant="secondary" onClick={() => setOpen(true)}>
         <Pencil size={15} /> Edit
       </Button>
@@ -41,6 +45,11 @@ export function ProductActions({
       </Button>
       <Drawer open={open} onClose={() => setOpen(false)} title="Edit product">
         <ProductForm product={product} categories={categories} suppliers={suppliers} businessId={businessId} onDone={() => setOpen(false)} />
+      </Drawer>
+      <Drawer open={variants} onClose={() => setVariants(false)} title="Add sizes and colours">
+        {variants && (
+          <ProductForm variantOf={product} categories={categories} suppliers={suppliers} businessId={businessId} onDone={() => setVariants(false)} />
+        )}
       </Drawer>
     </>
   );

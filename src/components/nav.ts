@@ -1,7 +1,10 @@
 import {
   ArrowLeftRight,
   BadgeCheck,
+  Banknote,
+  PiggyBank,
   Receipt,
+  Wallet,
   BarChart3,
   ClipboardCheck,
   History,
@@ -31,6 +34,7 @@ export const NAV: { group: string; items: NavItem[] }[] = [
       { href: "/app/receive", label: "Receive stock", icon: PackagePlus, roles: STOCK_ROLES, key: "R" },
       { href: "/app/transfer", label: "Transfer", icon: ArrowLeftRight, roles: STOCK_ROLES, multiStore: true, key: "T" },
       { href: "/app/count", label: "Stock count", icon: ClipboardCheck, roles: ["owner", "manager"] },
+      { href: "/app/close-day", label: "Close my day", icon: Wallet },
     ],
   },
   {
@@ -47,6 +51,8 @@ export const NAV: { group: string; items: NavItem[] }[] = [
       { href: "/app/movements", label: "Stock history", icon: History, roles: STOCK_ROLES },
       { href: "/app/movements", label: "My sales", icon: Receipt, roles: ["sales"] },
       { href: "/app/reports", label: "Reports", icon: BarChart3, roles: STOCK_ROLES },
+      { href: "/app/cash-ups", label: "Cash-ups", icon: Banknote, roles: ["owner", "manager"] },
+      { href: "/app/expenses", label: "Expenses & profit", icon: PiggyBank, roles: ["owner", "manager"] },
     ],
   },
   {

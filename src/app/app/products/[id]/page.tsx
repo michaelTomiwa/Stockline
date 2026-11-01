@@ -25,6 +25,10 @@ export default async function ProductPage({ params }: PageProps<"/app/products/[
   ]);
   const product = products.find((p) => p.id === id);
   if (!product) notFound();
+  // Other sizes/colours of the same item.
+  const siblings = product.style_id
+    ? products.filter((p) => p.style_id === product.style_id).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }))
+    : [];
 
   const per = ctx.stores.map((s) => {
     const q = levels.find((l) => l.store_id === s.id && l.product_id === id)?.quantity ?? 0;
@@ -80,6 +84,32 @@ export default async function ProductPage({ params }: PageProps<"/app/products/[
           </div>
         ))}
       </FadeIn>
+
+      {siblings.length > 1 && (
+        <Card title={`Sizes and colours (${siblings.length})`} className="mt-6">
+          <div className="flex flex-wrap gap-2 p-5">
+            {siblings.map((v) => {
+              const onHand = levels.filter((l) => l.product_id === v.id && storeIds.includes(l.store_id)).reduce((t, l) => t + l.quantity, 0);
+              const st = stockStatus(onHand, v.reorder_level);
+              return (
+                <Link
+                  key={v.id}
+                  href={`/app/products/${v.id}`}
+                  className={cn(
+                    "min-w-28 rounded-xl border px-3 py-2 text-sm transition hover:border-pine/50",
+                    v.id === product.id ? "border-pine bg-pine/5" : "border-line bg-panel",
+                  )}
+                >
+                  <span className="block font-semibold">{[v.size, v.color].filter(Boolean).join(" · ") || "Original"}</span>
+                  <span className={cn("block text-xs tnum", st === "out" ? "text-out" : st === "low" ? "text-low" : "text-muted")}>
+                    {qty(onHand)} {v.unit} · {money(v.sell_price, cur)}
+                  </span>
+                </Link>
+              );
+            })}
+          </div>
+        </Card>
+      )}
 
       <Card title="By store" className="mt-6">
         <table className="w-full text-sm">

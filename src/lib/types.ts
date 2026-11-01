@@ -35,6 +35,9 @@ export type Product = {
   sell_price: number;
   reorder_level: number;
   archived: boolean;
+  size?: string | null;
+  color?: string | null;
+  style_id?: string | null;
 };
 
 export type Category = { id: string; name: string };
@@ -81,3 +84,6 @@ export function stockStatus(quantity: number, reorder: number): StockStatus {
 export function num(v: unknown) {
   return v === null || v === undefined ? 0 : Number(v);
 }
+
+export type PaymentMethod = "cash" | "transfer" | "pos" | "other";
+export const PAYMENT_LABEL: Record<PaymentMethod, string> = { cash: "Cash", transfer: "Transfer", pos: "POS", other: "Other" };

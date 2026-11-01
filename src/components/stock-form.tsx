@@ -7,7 +7,8 @@ import { AnimatePresence, motion } from "framer-motion";
 import { ArrowRight, CircleCheck, MessageCircle, Minus, Plus, Printer, Search, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/browser";
 import { notifySale } from "@/app/app/actions";
-import type { Category, Product, Store, Supplier } from "@/lib/types";
+import type { Category, PaymentMethod, Product, Store, Supplier } from "@/lib/types";
+import { PAYMENT_LABEL } from "@/lib/types";
 import { stockStatus } from "@/lib/types";
 import { cn, dateTime, money, qty } from "@/lib/format";
 import { Button, ErrorNote, SelectField, friendlyError, inputClass } from "./ui-client";
@@ -64,9 +65,11 @@ export function StockForm({
   const [reference, setReference] = useState("");
   const [note, setNote] = useState("");
   const [reason, setReason] = useState("Stock count");
+  const [payment, setPayment] = useState<PaymentMethod>("cash");
+  const [given, setGiven] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [done, setDone] = useState<{ lines: Line[]; total: number; at: string; storeName: string; reference: string } | null>(null);
+  const [done, setDone] = useState<{ lines: Line[]; total: number; at: string; storeName: string; reference: string; payment: PaymentMethod } | null>(null);
   const search = useRef<HTMLInputElement>(null);
 
   const have = useCallback((productId: string, storeId = store) => levels[`${storeId}:${productId}`] ?? 0, [levels, store]);
@@ -133,9 +136,11 @@ export function StockForm({
         ? await supabase.rpc("transfer_stock", { p_from: store, p_to: toStore, p_items: items, p_note: note })
         : mode === "count"
           ? await supabase.rpc("count_stock", { p_store: store, p_items: items, p_reason: reason, p_note: note })
-          : await supabase.rpc("post_stock", {
+          : mode === "sell"
+            ? await supabase.rpc("record_sale", { p_store: store, p_items: items, p_payment: payment, p_reference: reference, p_note: note })
+            : await supabase.rpc("post_stock", {
               p_store: store,
-              p_type: mode === "sell" ? "sale" : "receive",
+              p_type: "receive",
               p_items: items,
               p_reference: reference,
               p_note: note,
@@ -145,7 +150,8 @@ export function StockForm({
     if (error) return setError(friendlyError(error.message));
     // Email the owner about the sale if they've asked for that; never holds up the till.
     if (mode === "sell" && typeof data === "string") notifySale(data).catch(() => {});
-    setDone({ lines, total, at: new Date().toISOString(), storeName: stores.find((x) => x.id === store)?.name ?? "", reference });
+    setDone({ lines, total, at: new Date().toISOString(), storeName: stores.find((x) => x.id === store)?.name ?? "", reference, payment });
+    setGiven("");
     setLines([]);
     setReference("");
     setNote("");
@@ -396,7 +402,48 @@ export function StockForm({
               </div>
             )}
             {mode === "sell" && (
-              <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="Receipt or payment ref (optional)" className={inputClass} />
+              <>
+                <div>
+                  <p className="mb-1.5 text-sm font-medium text-muted">Paid by</p>
+                  <div className="grid grid-cols-4 gap-1 rounded-xl border border-line bg-sunk p-1" role="radiogroup" aria-label="Payment method">
+                    {(Object.keys(PAYMENT_LABEL) as PaymentMethod[]).map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        role="radio"
+                        aria-checked={payment === m}
+                        onClick={() => setPayment(m)}
+                        className={cn("rounded-lg py-2 text-sm font-semibold transition", payment === m ? "bg-night text-white" : "text-muted hover:text-ink")}
+                      >
+                        {PAYMENT_LABEL[m]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {payment === "cash" ? (
+                  <div className="grid grid-cols-2 items-center gap-2">
+                    <input
+                      value={given}
+                      onChange={(e) => setGiven(e.target.value)}
+                      type="number"
+                      min={0}
+                      inputMode="numeric"
+                      placeholder="Customer gave (optional)"
+                      className={inputClass}
+                      aria-label="Cash given"
+                    />
+                    <p className={cn("text-right text-sm", Number(given) && Number(given) < total ? "text-out" : "text-muted")}>
+                      {Number(given) > 0
+                        ? Number(given) >= total
+                          ? <>Change <span className="font-bold text-ink tnum">{money(Number(given) - total, currency)}</span></>
+                          : <>Short by <span className="font-bold tnum">{money(total - Number(given), currency)}</span></>
+                        : "Type it to see the change"}
+                    </p>
+                  </div>
+                ) : (
+                  <input value={reference} onChange={(e) => setReference(e.target.value)} placeholder={payment === "transfer" ? "Transfer ref or sender name (optional)" : "Reference (optional)"} className={inputClass} />
+                )}
+              </>
             )}
             {mode === "count" && (
               <select value={reason} onChange={(e) => setReason(e.target.value)} className={inputClass} aria-label="Reason">
@@ -430,7 +477,7 @@ function Receipt({
   seller,
   businessName,
 }: {
-  done: { lines: Line[]; total: number; at: string; storeName: string; reference: string };
+  done: { lines: Line[]; total: number; at: string; storeName: string; reference: string; payment: PaymentMethod };
   currency: string;
   seller?: string;
   businessName?: string;
@@ -443,6 +490,7 @@ function Receipt({
     ...done.lines.map((l) => `${qty(l.quantity)} × ${l.product.name}  ${money(l.quantity * l.price, currency)}`),
     "",
     `*Total: ${money(done.total, currency)}*`,
+    `Paid by ${PAYMENT_LABEL[done.payment]}`,
     ...(done.reference ? [`Ref: ${done.reference}`] : []),
     ...(seller ? [`Served by ${seller}`] : []),
     "Thank you for shopping with us!",
@@ -469,7 +517,8 @@ function Receipt({
           <span>Total</span>
           <span className="tnum">{money(done.total, currency)}</span>
         </p>
-        {seller && <p className="mt-2 text-faint">Served by {seller}</p>}
+        <p className="mt-2 text-faint">Paid by {PAYMENT_LABEL[done.payment]}</p>
+        {seller && <p className="text-faint">Served by {seller}</p>}
       </div>
       <div className="no-print mt-3 flex gap-2">
         <input

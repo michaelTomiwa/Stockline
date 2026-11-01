@@ -28,3 +28,28 @@ export function greeting() {
   const h = Number(new Date().toLocaleString("en-GB", { hour: "2-digit", hour12: false, timeZone: "Africa/Lagos" }));
   return h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening";
 }
+
+/* Today in Lagos as YYYY-MM-DD. */
+export const lagosToday = () => new Date().toLocaleDateString("en-CA", { timeZone: "Africa/Lagos" });
+
+/* A calendar month ("2026-10") as a date range, with its neighbours for prev/next links. */
+export function monthRange(ym?: string) {
+  const current = lagosToday().slice(0, 7);
+  const valid = ym && /^\d{4}-\d{2}$/.test(ym) && ym <= current ? ym : current;
+  const [y, m] = valid.split("-").map(Number);
+  const last = new Date(Date.UTC(y, m, 0)).getUTCDate();
+  const shift = (d: number) => {
+    const t = new Date(Date.UTC(y, m - 1 + d, 1));
+    return `${t.getUTCFullYear()}-${String(t.getUTCMonth() + 1).padStart(2, "0")}`;
+  };
+  const to = valid === current ? lagosToday() : `${valid}-${String(last).padStart(2, "0")}`;
+  return {
+    key: valid,
+    from: `${valid}-01`,
+    to,
+    label: new Date(Date.UTC(y, m - 1, 15)).toLocaleDateString("en-GB", { month: "long", year: "numeric" }),
+    prev: shift(-1),
+    next: valid === current ? null : shift(1),
+    isCurrent: valid === current,
+  };
+}

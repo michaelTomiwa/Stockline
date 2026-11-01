@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Package, ShoppingCart } from "lucide-react";
+import { Package, ShoppingCart, Wallet } from "lucide-react";
 import type { Context } from "@/lib/context";
 import { loadCatalog, loadLevels, stockGrid } from "@/lib/inventory";
 import { loadSalespeople } from "@/lib/salespeople";
@@ -73,10 +73,10 @@ export async function SalesHome({ ctx }: { ctx: Context }) {
         </div>
       </FadeIn>
 
-      <FadeIn className="mb-6 grid grid-cols-[1fr_auto] gap-3 sm:grid-cols-[2fr_1fr]">
+      <FadeIn className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-[2fr_1fr_1fr]">
         <Link
           href="/app/sell"
-          className="group flex items-center gap-4 rounded-2xl bg-pine px-5 py-5 text-white transition hover:-translate-y-0.5 hover:bg-pine-deep"
+          className="group col-span-2 flex items-center gap-4 rounded-2xl bg-pine px-5 py-5 text-white transition hover:-translate-y-0.5 hover:bg-pine-deep sm:col-span-1"
         >
           <span className="grid size-12 place-items-center rounded-xl bg-citrus text-night transition group-hover:rotate-[-6deg]">
             <ShoppingCart size={24} />
@@ -90,6 +90,10 @@ export async function SalesHome({ ctx }: { ctx: Context }) {
           <Package size={22} className="text-pine" />
           <span className="hidden sm:inline">Check stock & prices</span>
           <span className="sm:hidden">Stock</span>
+        </Link>
+        <Link href="/app/close-day" className="flex items-center gap-3 rounded-2xl border border-line bg-panel px-5 py-5 font-semibold transition hover:-translate-y-0.5 hover:border-pine/40">
+          <Wallet size={22} className="text-pine" />
+          Close my day
         </Link>
       </FadeIn>
 

@@ -9,6 +9,7 @@ import { cn, money, qty } from "@/lib/format";
 import { Card, StatusBadge, StoreDot, td, th } from "@/components/ui";
 import { MovementTable } from "@/components/movement-list";
 import { ProductActions } from "@/components/product-actions";
+import { PriceCell } from "@/components/products-view";
 import { FadeIn } from "@/components/motion";
 
 export default async function ProductPage({ params }: PageProps<"/app/products/[id]">) {
@@ -57,7 +58,7 @@ export default async function ProductPage({ params }: PageProps<"/app/products/[
           </p>
         </div>
         {ctx.canManage && (
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <ProductActions product={product} categories={categories} suppliers={suppliers} businessId={ctx.business.id} />
           </div>
         )}
@@ -73,13 +74,17 @@ export default async function ProductPage({ params }: PageProps<"/app/products/[
               ]
             : [
                 { label: "Stock value", value: money(total * product.cost_price, cur), sub: `${money(total * product.sell_price, cur)} at selling price` },
-                { label: "Price", value: money(product.sell_price, cur), sub: `Cost ${money(product.cost_price, cur)} · ${margin}% margin` },
+                {
+                  label: ctx.canManage ? "Price (tap to change)" : "Price",
+                  value: ctx.canManage ? <PriceCell key={product.sell_price} id={product.id} price={product.sell_price} currency={cur} big /> : money(product.sell_price, cur),
+                  sub: `Cost ${money(product.cost_price, cur)} · ${margin}% margin`,
+                },
                 { label: "Sold, 30 days", value: `${qty(num(sold?.units))} ${product.unit}`, sub: money(num(sold?.revenue), cur) },
               ]),
         ].map((s) => (
           <div key={s.label} className="bg-panel p-4 sm:p-5">
             <p className="text-sm text-muted">{s.label}</p>
-            <p className="mt-1 text-xl font-bold tnum">{s.value}</p>
+            <div className="mt-1 text-xl font-bold tnum">{s.value}</div>
             <p className="mt-0.5 text-xs text-faint">{s.sub}</p>
           </div>
         ))}

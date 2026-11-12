@@ -7,6 +7,7 @@ import { cn, money, qty, timeAgo } from "@/lib/format";
 import { Card, PageHeader, StatusBadge, StoreDot, td, th } from "@/components/ui";
 import { HealthBar, RevenueChart } from "@/components/charts";
 import { Onboarding } from "@/components/onboarding";
+import { SampleDataBanner, type SampleSummary } from "@/components/sample-data-banner";
 import { CountUp, FadeIn, Reveal } from "@/components/motion";
 import { lastDays } from "@/lib/dates";
 import { SalesHome } from "@/components/sales-home";
@@ -38,6 +39,7 @@ export default async function Overview() {
       .limit(10),
     loadSalespeople(ctx, { scopeToActiveStore: true }),
   ]);
+  const sample = ctx.isOwner ? ((await ctx.supabase.rpc("sample_data_summary")).data as SampleSummary | null) : null;
 
   if (products.length === 0 || ctx.stores.length === 0) {
     return (
@@ -88,6 +90,7 @@ export default async function Overview() {
         title={first ? `Good to see you, ${first}` : "Overview"}
         description={<>Showing {scopeName}. Switch stores at the top right.</>}
       />
+      {sample && <SampleDataBanner summary={sample} />}
 
       <FadeIn className="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {[

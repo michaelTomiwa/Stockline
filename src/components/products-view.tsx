@@ -3,13 +3,13 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowDownUp, Download, Pencil, Plus, Search } from "lucide-react";
+import { ArrowDownUp, Check, Download, Pencil, Plus, Search, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/browser";
 import type { Category, Product, StockStatus, Store, Supplier } from "@/lib/types";
 import { stockStatus } from "@/lib/types";
 import { cn, money, qty } from "@/lib/format";
 import { StatusBadge, StoreDot, td, th } from "./ui";
-import { Button, Drawer, inputClass } from "./ui-client";
+import { Button, Drawer, friendlyError, inputClass } from "./ui-client";
 import { ProductForm } from "./product-form";
 import { downloadCsv } from "@/lib/csv";
 
@@ -42,6 +42,8 @@ export function ProductsView({
   const [cat, setCat] = useState("all");
   const [status, setStatus] = useState<StockStatus | "all">((params.get("status") as StockStatus) ?? "all");
   const [sort, setSort] = useState<SortKey>("name");
+  // Narrow to products that have been stocked at one store (hides other stores' items).
+  const [where, setWhere] = useState("all");
   const [editing, setEditing] = useState<Product | "new" | null>(params.get("new") ? "new" : null);
 
   const catName = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories]);
@@ -52,6 +54,7 @@ export function ProductsView({
       (r) =>
         (!s || `${r.name} ${r.sku} ${r.barcode ?? ""}`.toLowerCase().includes(s)) &&
         (cat === "all" || r.category_id === cat) &&
+        (where === "all" || where in r.perStore) &&
         (status === "all" || (status === "low" ? r.status === "low" || r.status === "out" : r.status === status)),
     );
     const by: Record<SortKey, (a: ProductRow, b: ProductRow) => number> = {
@@ -61,7 +64,7 @@ export function ProductsView({
       price: (a, b) => b.sell_price - a.sell_price,
     };
     return list.sort(by[sort]);
-  }, [rows, q, cat, status, sort]);
+  }, [rows, q, cat, status, sort, where]);
 
   const counts = {
     all: rows.length,
@@ -131,6 +134,16 @@ export function ProductsView({
               </option>
             ))}
           </select>
+          {stores.length > 1 && (
+            <select value={where} onChange={(e) => setWhere(e.target.value)} className={cn(inputClass.replace("w-full", "w-48"), "bg-panel")} aria-label="Store">
+              <option value="all">All stores</option>
+              {stores.map((s) => (
+                <option key={s.id} value={s.id}>
+                  Only {s.name}
+                </option>
+              ))}
+            </select>
+          )}
           <label className="flex items-center gap-1.5 rounded-xl border border-line bg-panel pl-3 text-sm text-muted">
             <ArrowDownUp size={14} />
             <select value={sort} onChange={(e) => setSort(e.target.value as SortKey)} className="h-10 bg-transparent pr-2 outline-none" aria-label="Sort">
@@ -151,8 +164,32 @@ export function ProductsView({
         </div>
       </div>
 
+      {canManage && shown.length > 0 && (
+        <p className="mb-2 flex items-center gap-1.5 text-sm text-muted">
+          <Pencil size={13} className="text-pine" /> Tap any price to change it.
+        </p>
+      )}
       <div className="overflow-hidden rounded-2xl border border-line bg-panel">
-        <div className="overflow-x-auto">
+        {/* Phones: one card per product, price right there to tap. */}
+        <ul className="divide-y divide-line sm:hidden">
+          {shown.map((r) => (
+            <li key={r.id} className="flex items-center gap-3 px-4 py-3">
+              <Link href={`/app/products/${r.id}`} className="min-w-0 flex-1">
+                <span className="block truncate font-medium">{r.name}</span>
+                <span className="mt-0.5 flex items-center gap-2 text-xs text-muted">
+                  <span className={cn("font-semibold tnum", r.status === "out" ? "text-out" : r.status === "low" ? "text-low" : "text-ink")}>
+                    {qty(r.total)} {r.unit}
+                  </span>
+                  <span className="truncate font-mono text-faint">{r.sku}</span>
+                </span>
+              </Link>
+              <span className="shrink-0 text-right text-sm">
+                {canManage ? <PriceCell id={r.id} price={r.sell_price} currency={currency} /> : <span className="font-semibold tnum">{money(r.sell_price, currency)}</span>}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <div className="hidden overflow-x-auto sm:block">
           <table className="w-full min-w-[760px] text-sm">
             <thead className="bg-sunk">
               <tr>
@@ -229,57 +266,84 @@ export function ProductsView({
   );
 }
 
-/* Click a price to change it; Enter saves, Escape cancels. */
-function PriceCell({ id, price, currency }: { id: string; price: number; currency: string }) {
+/*
+  Tap a price to change it. Works on phones: a pencil is always shown, the input opens the
+  number keypad, and there's a Save button (Enter also saves, Escape cancels).
+  The update asks for the row back, so a save that changed nothing is reported, not hidden.
+*/
+export function PriceCell({ id, price, currency, big = false }: { id: string; price: number; currency: string; big?: boolean }) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(String(price));
   const [busy, setBusy] = useState(false);
-  const [failed, setFailed] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<number | null>(null);
+  const shown = saved ?? price;
 
   async function save() {
-    const next = Number(value);
-    if (!Number.isFinite(next) || next < 0 || next === price) return setEditing(false);
+    const next = Number(value.replace(/[,\s₦]/g, ""));
+    if (value.trim() === "" || !Number.isFinite(next) || next < 0) return setError("Type a number, e.g. 9000");
+    if (next === shown) return setEditing(false);
     setBusy(true);
-    const { error } = await createClient().from("products").update({ sell_price: next }).eq("id", id);
+    setError(null);
+    const { data, error } = await createClient().from("products").update({ sell_price: next }).eq("id", id).select("id");
     setBusy(false);
-    if (error) return setFailed(true);
+    if (error) return setError(friendlyError(error.message));
+    if (!data || data.length === 0) return setError("Couldn't save. Your account can't change this price.");
+    setSaved(next);
     setEditing(false);
     router.refresh();
+    setTimeout(() => setSaved(null), 4000);
   }
 
   if (!editing) {
     return (
       <button
+        type="button"
         onClick={() => {
-          setValue(String(price));
-          setFailed(false);
+          setValue(String(shown));
+          setError(null);
           setEditing(true);
         }}
-        className="group inline-flex items-center gap-1.5 rounded-lg px-1.5 py-0.5 hover:bg-sunk"
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-lg border border-dashed border-line px-2 py-1 font-semibold tnum transition hover:border-pine hover:bg-pine/5",
+          big && "px-3 py-1.5 text-lg",
+          saved !== null && "border-solid border-ok bg-ok/10 text-ok",
+        )}
         title="Change price"
       >
-        <Pencil size={12} className="text-faint opacity-0 transition group-hover:opacity-100" />
-        {money(price, currency)}
+        {saved !== null ? <Check size={big ? 16 : 13} /> : <Pencil size={big ? 15 : 12} className="text-pine" />}
+        {money(shown, currency)}
       </button>
     );
   }
   return (
-    <input
-      autoFocus
-      type="number"
-      min={0}
-      step="any"
-      value={value}
-      disabled={busy}
-      onChange={(e) => setValue(e.target.value)}
-      onBlur={save}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") save();
-        if (e.key === "Escape") setEditing(false);
-      }}
-      aria-label="New price"
-      className={cn("h-8 w-28 rounded-lg border bg-panel px-2 text-right text-sm tnum outline-none", failed ? "border-out" : "border-pine")}
-    />
+    <span className="inline-flex flex-col items-end gap-1">
+      <span className="inline-flex items-center gap-1">
+        <input
+          autoFocus
+          type="text"
+          inputMode="decimal"
+          enterKeyHint="done"
+          value={value}
+          disabled={busy}
+          onFocus={(e) => e.currentTarget.select()}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") save();
+            if (e.key === "Escape") setEditing(false);
+          }}
+          aria-label="New price"
+          className={cn("h-10 w-28 rounded-lg border bg-panel px-2 text-right text-base tnum outline-none", error ? "border-out" : "border-pine")}
+        />
+        <button type="button" onClick={save} disabled={busy} className="grid h-10 min-w-10 place-items-center rounded-lg bg-pine px-2 text-sm font-semibold text-white disabled:opacity-60">
+          {busy ? "…" : "Save"}
+        </button>
+        <button type="button" onClick={() => setEditing(false)} aria-label="Cancel" className="grid size-10 place-items-center rounded-lg text-muted hover:bg-sunk">
+          <X size={16} />
+        </button>
+      </span>
+      {error && <span className="max-w-56 text-right text-xs text-out">{error}</span>}
+    </span>
   );
 }

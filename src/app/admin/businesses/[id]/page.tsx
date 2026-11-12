@@ -8,6 +8,7 @@ import { MOVEMENT_LABEL, ROLE_LABEL, num, type MovementType, type Role } from "@
 import { Card, StoreDot, td, th } from "@/components/ui";
 import { FadeIn, Reveal } from "@/components/motion";
 import { RevenueChart } from "@/components/charts";
+import { SampleDataBanner } from "@/components/sample-data-banner";
 
 export const metadata = { title: "Business" };
 
@@ -52,6 +53,7 @@ export default async function AdminBusinessPage({ params }: PageProps<"/admin/bu
   const stockValue = d.stores.reduce((s, x) => s + num(x.stock_value), 0);
   const sales30 = series.reduce((s, x) => s + x.revenue, 0);
   const salespeople = d.people.filter((p) => p.role === "sales");
+  const sampleStores = d.stores.filter((s) => ["Ikeja", "Lekki", "Wuse 2"].includes(s.name)).map((s) => s.name);
 
   return (
     <>
@@ -65,7 +67,7 @@ export default async function AdminBusinessPage({ params }: PageProps<"/admin/bu
             Owner {d.business.owner_email ?? "unknown"} · joined {fullDate(d.business.created_at)}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <Link href={`/admin/businesses/${d.business.id}/products`} className="inline-flex h-10 items-center rounded-xl border border-line bg-panel px-4 text-sm font-semibold hover:bg-sunk">
             Products & prices
           </Link>
@@ -74,6 +76,8 @@ export default async function AdminBusinessPage({ params }: PageProps<"/admin/bu
           </Link>
         </div>
       </FadeIn>
+
+      {sampleStores.length > 0 && <SampleDataBanner businessId={d.business.id} summary={{ stores: sampleStores, products: 0, movements: 0, suppliers: 0 }} />}
 
       <FadeIn delay={0.05} className="grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line md:grid-cols-3 xl:grid-cols-6">
         {[

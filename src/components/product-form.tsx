@@ -35,8 +35,12 @@ export function ProductForm({
   const [error, setError] = useState<string | null>(null);
   const template = product ?? variantOf;
   const base = variantOf ? baseOf(variantOf) : null;
-  const [cost, setCost] = useState(template?.cost_price ?? 0);
-  const [price, setPrice] = useState(template?.sell_price ?? 0);
+  // Kept as text so the box can be cleared and retyped on a phone.
+  const [costText, setCostText] = useState(String(template?.cost_price ?? ""));
+  const [priceText, setPriceText] = useState(String(template?.sell_price ?? ""));
+  const toNum = (t: string) => Number(t.replace(/[,\s₦]/g, "")) || 0;
+  const cost = toNum(costText);
+  const price = toNum(priceText);
   const [sizes, setSizes] = useState("");
   const [colors, setColors] = useState("");
   const [showVariants, setShowVariants] = useState(!!variantOf);
@@ -79,7 +83,8 @@ export function ProductForm({
     };
     let error: { message: string } | null = null;
     if (product) {
-      ({ error } = await supabase.from("products").update(row).eq("id", product.id));
+      const res = await supabase.from("products").update(row).eq("id", product.id).select("id");
+      error = res.error ?? (res.data?.length ? null : { message: "Couldn't save. Your account can't change this product." });
     } else if (makingVariants) {
       // The product we're adding to joins the style too.
       const styleId = variantOf ? (variantOf.style_id ?? variantOf.id) : crypto.randomUUID();
@@ -148,8 +153,8 @@ export function ProductForm({
         />
       </div>
       <div className="grid grid-cols-2 gap-3">
-        <Field label="Cost price" type="number" min={0} step="any" value={cost} onChange={(e) => setCost(Number(e.target.value))} required />
-        <Field label="Selling price" type="number" min={0} step="any" value={price} onChange={(e) => setPrice(Number(e.target.value))} required />
+        <Field label="Cost price" inputMode="decimal" value={costText} onChange={(e) => setCostText(e.target.value)} placeholder="0" />
+        <Field label="Selling price" inputMode="decimal" value={priceText} onChange={(e) => setPriceText(e.target.value)} placeholder="0" required />
       </div>
       <p className={`text-sm ${margin < 0 ? "text-out" : "text-muted"}`}>
         Margin: <span className="font-semibold tnum">{margin}%</span> ({(price - cost).toLocaleString("en-NG")} per unit)

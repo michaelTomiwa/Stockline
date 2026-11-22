@@ -335,7 +335,7 @@ export function PriceCell({ id, price, currency, big = false }: { id: string; pr
   }
   return (
     <span className="inline-flex flex-col items-end gap-1">
-      <span className="inline-flex items-center gap-1">
+      <span className="inline-flex flex-wrap items-center justify-end gap-1">
         <input
           autoFocus
           type="text"
@@ -368,7 +368,19 @@ export function PriceCell({ id, price, currency, big = false }: { id: string; pr
   Tap the quantity at a store to set what's really on the shelf. Saved as a stock-count
   adjustment (so history shows who changed it and by how much), not by overwriting.
 */
-export function StockCell({ productId, storeId, quantity, unit }: { productId: string; storeId: string; quantity: number; unit: string }) {
+export function StockCell({
+  productId,
+  storeId,
+  quantity,
+  unit,
+  big = false,
+}: {
+  productId: string;
+  storeId: string;
+  quantity: number;
+  unit: string;
+  big?: boolean;
+}) {
   const router = useRouter();
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(String(quantity));
@@ -408,18 +420,19 @@ export function StockCell({ productId, storeId, quantity, unit }: { productId: s
         }}
         className={cn(
           "inline-flex items-center gap-1.5 rounded-lg border border-dashed border-line px-2 py-1 font-semibold tnum transition hover:border-pine hover:bg-pine/5",
+          big && "px-3 py-1.5 text-lg",
           saved !== null && "border-solid border-ok bg-ok/10 text-ok",
         )}
         title="Change the quantity"
       >
-        {saved !== null ? <Check size={13} /> : <Pencil size={12} className="text-pine" />}
+        {saved !== null ? <Check size={big ? 16 : 13} /> : <Pencil size={big ? 15 : 12} className="text-pine" />}
         {qty(shown)} <span className="font-normal text-faint">{unit}</span>
       </button>
     );
   }
   return (
     <span className="inline-flex flex-col items-end gap-1">
-      <span className="inline-flex items-center gap-1">
+      <span className="inline-flex flex-wrap items-center justify-end gap-1">
         <input
           autoFocus
           type="text"

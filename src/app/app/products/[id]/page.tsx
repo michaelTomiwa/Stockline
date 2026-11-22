@@ -37,6 +37,13 @@ export default async function ProductPage({ params }: PageProps<"/app/products/[
   });
   const inScope = per.filter((p) => storeIds.includes(p.store.id));
   const total = inScope.reduce((s, p) => s + p.quantity, 0);
+  // Which store the "On hand" box changes: the store picked at the top, else the one store
+  // that holds this product, else (nothing anywhere yet) the store holding the most products.
+  const held = inScope.filter((p) => levels.some((l) => l.store_id === p.store.id && l.product_id === id));
+  const busiest = [...inScope].sort(
+    (a, b) => levels.filter((l) => l.store_id === b.store.id && l.quantity > 0).length - levels.filter((l) => l.store_id === a.store.id && l.quantity > 0).length,
+  )[0];
+  const editAt = ctx.canManage ? (inScope.length === 1 ? inScope[0] : held.length === 1 ? held[0] : held.length === 0 ? busiest : null) : null;
   const sold = ((salesRes.data ?? []) as { product_id: string; units: unknown; revenue: unknown }[]).find((r) => r.product_id === id);
   const margin = product.sell_price > 0 ? Math.round(((product.sell_price - product.cost_price) / product.sell_price) * 100) : 0;
   const category = categories.find((c) => c.id === product.category_id)?.name;
@@ -66,7 +73,19 @@ export default async function ProductPage({ params }: PageProps<"/app/products/[
 
       <FadeIn delay={0.05} className={cn("grid grid-cols-2 gap-px overflow-hidden rounded-2xl border border-line bg-line", ctx.isSales ? "lg:grid-cols-3" : "lg:grid-cols-4")}>
         {[
-          { label: "On hand", value: `${qty(total)} ${product.unit}`, sub: `Reorder at ${qty(product.reorder_level)} per store` },
+          {
+            label: editAt ? "On hand (tap to change)" : "On hand",
+            value: editAt ? (
+              <StockCell key={`${editAt.store.id}-${editAt.quantity}`} productId={product.id} storeId={editAt.store.id} quantity={editAt.quantity} unit={product.unit} big />
+            ) : (
+              `${qty(total)} ${product.unit}`
+            ),
+            sub: editAt
+              ? `At ${editAt.store.name} · reorder at ${qty(product.reorder_level)}`
+              : ctx.canManage
+                ? "In more than one store: change each under “By store” below"
+                : `Reorder at ${qty(product.reorder_level)} per store`,
+          },
           ...(ctx.isSales
             ? [
                 { label: "Price", value: money(product.sell_price, cur), sub: `per ${product.unit}` },

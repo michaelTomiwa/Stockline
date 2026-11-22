@@ -46,6 +46,9 @@ export function ProductsView({
   const [where, setWhere] = useState("all");
   const [editing, setEditing] = useState<Product | "new" | null>(params.get("new") ? "new" : null);
 
+  // The store whose quantities can be changed straight from the list.
+  const editStore = canManage ? (where !== "all" ? where : stores.length === 1 ? stores[0].id : null) : null;
+
   const catName = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories]);
 
   const shown = useMemo(() => {
@@ -54,7 +57,7 @@ export function ProductsView({
       (r) =>
         (!s || `${r.name} ${r.sku} ${r.barcode ?? ""}`.toLowerCase().includes(s)) &&
         (cat === "all" || r.category_id === cat) &&
-        (where === "all" || where in r.perStore) &&
+        (where === "all" || where in r.perStore || Object.keys(r.perStore).length === 0) &&
         (status === "all" || (status === "low" ? r.status === "low" || r.status === "out" : r.status === status)),
     );
     const by: Record<SortKey, (a: ProductRow, b: ProductRow) => number> = {
@@ -166,7 +169,11 @@ export function ProductsView({
 
       {canManage && shown.length > 0 && (
         <p className="mb-2 flex items-center gap-1.5 text-sm text-muted">
-          <Pencil size={13} className="text-pine" /> Tap any price to change it.
+          <Pencil size={13} className="text-pine" />
+          <span>
+            Tap any price{editStore || stores.length === 1 ? " or quantity" : ""} to change it.
+            {!editStore && stores.length > 1 && <span className="sm:hidden"> To change quantities, pick a store in the &ldquo;All stores&rdquo; box.</span>}
+          </span>
         </p>
       )}
       <div className="overflow-hidden rounded-2xl border border-line bg-panel">
@@ -177,13 +184,16 @@ export function ProductsView({
               <Link href={`/app/products/${r.id}`} className="min-w-0 flex-1">
                 <span className="block truncate font-medium">{r.name}</span>
                 <span className="mt-0.5 flex items-center gap-2 text-xs text-muted">
-                  <span className={cn("font-semibold tnum", r.status === "out" ? "text-out" : r.status === "low" ? "text-low" : "text-ink")}>
-                    {qty(r.total)} {r.unit}
-                  </span>
+                  {!editStore && (
+                    <span className={cn("font-semibold tnum", r.status === "out" ? "text-out" : r.status === "low" ? "text-low" : "text-ink")}>
+                      {qty(r.total)} {r.unit}
+                    </span>
+                  )}
                   <span className="truncate font-mono text-faint">{r.sku}</span>
                 </span>
               </Link>
-              <span className="shrink-0 text-right text-sm">
+              <span className="flex shrink-0 flex-col items-end gap-1.5 text-right text-sm">
+                {editStore && <StockCell key={`${editStore}-${r.perStore[editStore] ?? 0}`} productId={r.id} storeId={editStore} quantity={r.perStore[editStore] ?? 0} unit={r.unit} />}
                 {canManage ? <PriceCell id={r.id} price={r.sell_price} currency={currency} /> : <span className="font-semibold tnum">{money(r.sell_price, currency)}</span>}
               </span>
             </li>
@@ -225,12 +235,18 @@ export function ProductsView({
                       const st = stockStatus(v, r.reorder_level);
                       return (
                         <td key={s.id} className={cn(td, "text-right tnum", st === "out" && "text-out", st === "low" && "text-low")}>
-                          {qty(v)}
+                          {canManage ? <StockCell key={v} productId={r.id} storeId={s.id} quantity={v} unit="" /> : qty(v)}
                         </td>
                       );
                     })}
                   <td className={cn(td, "text-right font-semibold tnum")}>
-                    {qty(r.total)} <span className="font-normal text-faint">{r.unit}</span>
+                    {canManage && stores.length === 1 ? (
+                      <StockCell key={r.total} productId={r.id} storeId={stores[0].id} quantity={r.total} unit={r.unit} />
+                    ) : (
+                      <>
+                        {qty(r.total)} <span className="font-normal text-faint">{r.unit}</span>
+                      </>
+                    )}
                   </td>
                   <td className={cn(td, "text-right tnum")}>
                     {canManage ? <PriceCell id={r.id} price={r.sell_price} currency={currency} /> : money(r.sell_price, currency)}
@@ -335,6 +351,90 @@ export function PriceCell({ id, price, currency, big = false }: { id: string; pr
           }}
           aria-label="New price"
           className={cn("h-10 w-28 rounded-lg border bg-panel px-2 text-right text-base tnum outline-none", error ? "border-out" : "border-pine")}
+        />
+        <button type="button" onClick={save} disabled={busy} className="grid h-10 min-w-10 place-items-center rounded-lg bg-pine px-2 text-sm font-semibold text-white disabled:opacity-60">
+          {busy ? "…" : "Save"}
+        </button>
+        <button type="button" onClick={() => setEditing(false)} aria-label="Cancel" className="grid size-10 place-items-center rounded-lg text-muted hover:bg-sunk">
+          <X size={16} />
+        </button>
+      </span>
+      {error && <span className="max-w-56 text-right text-xs text-out">{error}</span>}
+    </span>
+  );
+}
+
+/*
+  Tap the quantity at a store to set what's really on the shelf. Saved as a stock-count
+  adjustment (so history shows who changed it and by how much), not by overwriting.
+*/
+export function StockCell({ productId, storeId, quantity, unit }: { productId: string; storeId: string; quantity: number; unit: string }) {
+  const router = useRouter();
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState(String(quantity));
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [saved, setSaved] = useState<number | null>(null);
+  const shown = saved ?? quantity;
+
+  async function save() {
+    const next = Number(value.replace(/[,\s]/g, ""));
+    if (value.trim() === "" || !Number.isFinite(next) || next < 0) return setError("Type how many are there, e.g. 12");
+    if (next === shown) return setEditing(false);
+    setBusy(true);
+    setError(null);
+    const { error } = await createClient().rpc("count_stock", {
+      p_store: storeId,
+      p_items: [{ product_id: productId, counted: next }],
+      p_reason: "Correction",
+      p_note: null,
+    });
+    setBusy(false);
+    if (error) return setError(friendlyError(error.message));
+    setSaved(next);
+    setEditing(false);
+    router.refresh();
+    setTimeout(() => setSaved(null), 4000);
+  }
+
+  if (!editing) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setValue(String(shown));
+          setError(null);
+          setEditing(true);
+        }}
+        className={cn(
+          "inline-flex items-center gap-1.5 rounded-lg border border-dashed border-line px-2 py-1 font-semibold tnum transition hover:border-pine hover:bg-pine/5",
+          saved !== null && "border-solid border-ok bg-ok/10 text-ok",
+        )}
+        title="Change the quantity"
+      >
+        {saved !== null ? <Check size={13} /> : <Pencil size={12} className="text-pine" />}
+        {qty(shown)} <span className="font-normal text-faint">{unit}</span>
+      </button>
+    );
+  }
+  return (
+    <span className="inline-flex flex-col items-end gap-1">
+      <span className="inline-flex items-center gap-1">
+        <input
+          autoFocus
+          type="text"
+          inputMode="decimal"
+          enterKeyHint="done"
+          value={value}
+          disabled={busy}
+          onFocus={(e) => e.currentTarget.select()}
+          onChange={(e) => setValue(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") save();
+            if (e.key === "Escape") setEditing(false);
+          }}
+          aria-label="How many are there"
+          className={cn("h-10 w-20 rounded-lg border bg-panel px-2 text-right text-base tnum outline-none", error ? "border-out" : "border-pine")}
         />
         <button type="button" onClick={save} disabled={busy} className="grid h-10 min-w-10 place-items-center rounded-lg bg-pine px-2 text-sm font-semibold text-white disabled:opacity-60">
           {busy ? "…" : "Save"}

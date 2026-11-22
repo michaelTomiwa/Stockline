@@ -1,5 +1,5 @@
 import "server-only";
-import { getContext, operatingStore } from "./context";
+import { getContext, isSampleStore, operatingStore } from "./context";
 import { loadCatalog, loadLevels } from "./inventory";
 
 /* Everything the sell / receive / transfer / count screens need. */
@@ -10,7 +10,14 @@ export async function loadStockPage() {
     loadLevels(ctx, ctx.stores.map((s) => s.id)),
   ]);
   const map: Record<string, number> = {};
-  for (const l of levels) map[`${l.store_id}:${l.product_id}`] = l.quantity;
+  const perStore: Record<string, number> = {};
+  for (const l of levels) {
+    map[`${l.store_id}:${l.product_id}`] = l.quantity;
+    if (l.quantity > 0) perStore[l.store_id] = (perStore[l.store_id] ?? 0) + 1;
+  }
+  // With "All stores" picked, open on the store that actually holds the most products.
+  const busiest = ctx.stores.filter((s) => !isSampleStore(s)).sort((a, b) => (perStore[b.id] ?? 0) - (perStore[a.id] ?? 0))[0];
+  const defaultStore = ctx.activeStore === "all" ? (busiest?.id ?? operatingStore(ctx)) : operatingStore(ctx);
   return {
     ctx,
     props: {
@@ -19,7 +26,7 @@ export async function loadStockPage() {
       suppliers,
       stores: ctx.stores,
       levels: map,
-      defaultStore: operatingStore(ctx) ?? "",
+      defaultStore: defaultStore ?? "",
       currency: ctx.business.currency,
     },
   };

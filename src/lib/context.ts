@@ -60,5 +60,13 @@ export async function getStockContext() {
 
 /* Pages that change stock need one specific store. */
 export function operatingStore(ctx: Context) {
-  return ctx.activeStore === "all" ? (ctx.stores[0]?.id ?? null) : ctx.activeStore;
+  if (ctx.activeStore !== "all") return ctx.activeStore;
+  // Never default to one of the "sample data" stores when the business has a real one.
+  const real = ctx.stores.find((s) => !isSampleStore(s));
+  return (real ?? ctx.stores[0])?.id ?? null;
+}
+
+const SAMPLE_STORES: Record<string, string> = { Ikeja: "0803 000 1101", Lekki: "0803 000 1102", "Wuse 2": "0803 000 1103" };
+export function isSampleStore(s: { name: string; phone?: string | null }) {
+  return SAMPLE_STORES[s.name] !== undefined && SAMPLE_STORES[s.name] === s.phone;
 }

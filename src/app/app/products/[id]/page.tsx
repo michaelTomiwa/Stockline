@@ -9,7 +9,7 @@ import { cn, money, qty } from "@/lib/format";
 import { Card, StatusBadge, StoreDot, td, th } from "@/components/ui";
 import { MovementTable } from "@/components/movement-list";
 import { ProductActions } from "@/components/product-actions";
-import { PriceCell } from "@/components/products-view";
+import { PriceCell, StockCell } from "@/components/products-view";
 import { FadeIn } from "@/components/motion";
 
 export default async function ProductPage({ params }: PageProps<"/app/products/[id]">) {
@@ -116,13 +116,13 @@ export default async function ProductPage({ params }: PageProps<"/app/products/[
         </Card>
       )}
 
-      <Card title="By store" className="mt-6">
+      <Card title="By store" className="mt-6" action={ctx.canManage ? <span className="text-xs text-muted">Tap a number to change it</span> : undefined}>
         <table className="w-full text-sm">
           <thead className="bg-sunk">
             <tr>
               <th className={th}>Store</th>
               <th className={cn(th, "text-right")}>On hand</th>
-              <th className={cn(th, "text-right")}>Suggested order</th>
+              <th className={cn(th, "hidden text-right sm:table-cell")}>Suggested order</th>
               <th className={th}>Status</th>
             </tr>
           </thead>
@@ -135,8 +135,14 @@ export default async function ProductPage({ params }: PageProps<"/app/products/[
                     {p.store.name}
                   </span>
                 </td>
-                <td className={cn(td, "text-right font-semibold tnum")}>{qty(p.quantity)}</td>
-                <td className={cn(td, "text-right tnum text-muted")}>
+                <td className={cn(td, "text-right font-semibold tnum")}>
+                  {ctx.canManage ? (
+                    <StockCell key={p.quantity} productId={product.id} storeId={p.store.id} quantity={p.quantity} unit={product.unit} />
+                  ) : (
+                    qty(p.quantity)
+                  )}
+                </td>
+                <td className={cn(td, "hidden text-right tnum text-muted sm:table-cell")}>
                   {p.status === "ok" ? "—" : `+${qty(suggestedOrder(p.quantity, product.reorder_level))}`}
                 </td>
                 <td className={td}>

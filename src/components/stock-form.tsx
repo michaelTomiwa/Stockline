@@ -1,10 +1,10 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowRight, CircleCheck, MessageCircle, Minus, Plus, Printer, Search, Trash2 } from "lucide-react";
+import { ArrowDown, ArrowRight, CircleCheck, MessageCircle, Minus, Plus, Printer, Search, Trash2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/browser";
 import { notifySale } from "@/app/app/actions";
 import type { Category, PaymentMethod, Product, Store, Supplier } from "@/lib/types";
@@ -71,6 +71,8 @@ export function StockForm({
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<{ lines: Line[]; total: number; at: string; storeName: string; reference: string; payment: PaymentMethod } | null>(null);
   const search = useRef<HTMLInputElement>(null);
+  const linesRef = useRef<HTMLDivElement>(null);
+  const [justAdded, setJustAdded] = useState<string | null>(null);
 
   const have = useCallback((productId: string, storeId = store) => levels[`${storeId}:${productId}`] ?? 0, [levels, store]);
 
@@ -84,6 +86,7 @@ export function StockForm({
   const add = useCallback(
     (p: Product) => {
       setError(null);
+      setJustAdded(p.id);
       setLines((ls) => {
         const i = ls.findIndex((l) => l.product.id === p.id);
         if (i >= 0) {
@@ -294,8 +297,25 @@ export function StockForm({
         </div>
       </div>
 
+      {/* Phones: the list of added items is below the product cards, so keep a way to get to it in view. */}
+      {lines.length > 0 && (
+        <button
+          type="button"
+          onClick={() => linesRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+          className="fixed inset-x-4 bottom-4 z-30 flex h-14 items-center justify-between rounded-2xl bg-night px-5 text-white shadow-2xl lg:hidden"
+        >
+          <span className="font-semibold">
+            {lines.length} {lines.length === 1 ? "item" : "items"}
+            {mode === "count" ? " · type the counts" : mode !== "transfer" ? ` · ${money(total, currency)}` : ""}
+          </span>
+          <span className="flex items-center gap-1 text-sm font-semibold text-citrus">
+            {mode === "count" ? "Go to counts" : "Review"} <ArrowDown size={16} />
+          </span>
+        </button>
+      )}
+
       {/* Lines */}
-      <div className="lg:sticky lg:top-24 lg:self-start">
+      <div ref={linesRef} className="scroll-mt-20 pb-20 lg:sticky lg:top-24 lg:self-start lg:pb-0">
         <div className="rounded-2xl border border-line bg-panel">
           <div className="flex items-center justify-between border-b border-line px-5 py-3.5">
             <h2 className="font-semibold">
@@ -312,7 +332,7 @@ export function StockForm({
           ) : (
             <ul className="max-h-[46vh] divide-y divide-line overflow-y-auto">
               <AnimatePresence initial={false}>
-                {lines.map((l) => {
+                {lines.map((l, i) => {
                   const h = have(l.product.id);
                   const over = (mode === "sell" || mode === "transfer") && l.quantity > h;
                   const diff = l.quantity - h;
@@ -344,14 +364,12 @@ export function StockForm({
                           <button onClick={() => setLine(l.product.id, { quantity: Math.max(0, l.quantity - 1) })} className="p-2 text-muted hover:text-ink" aria-label="Less">
                             <Minus size={14} />
                           </button>
-                          <input
-                            type="number"
-                            min={0}
-                            step="any"
+                          <NumberBox
                             value={l.quantity}
-                            onChange={(e) => setLine(l.product.id, { quantity: Math.max(0, Number(e.target.value)) })}
-                            aria-label={copy[mode].qtyLabel}
-                            className="w-14 bg-transparent text-center font-semibold tnum outline-none"
+                            onValue={(n) => setLine(l.product.id, { quantity: Math.max(0, n) })}
+                            label={copy[mode].qtyLabel}
+                            autoFocus={mode === "count" && i === 0 && justAdded === l.product.id}
+                            className="h-10 w-16 bg-transparent text-center text-base font-semibold tnum outline-none"
                           />
                           <button onClick={() => setLine(l.product.id, { quantity: l.quantity + 1 })} className="p-2 text-muted hover:text-ink" aria-label="More">
                             <Plus size={14} />
@@ -363,13 +381,10 @@ export function StockForm({
                         {((mode === "sell" && !lockPrices) || mode === "receive") && (
                           <label className="flex items-center gap-1 text-xs text-muted">
                             @
-                            <input
-                              type="number"
-                              min={0}
-                              step="any"
+                            <NumberBox
                               value={l.price}
-                              onChange={(e) => setLine(l.product.id, { price: Number(e.target.value) })}
-                              aria-label={mode === "sell" ? "Unit price" : "Unit cost"}
+                              onValue={(n) => setLine(l.product.id, { price: Math.max(0, n) })}
+                              label={mode === "sell" ? "Unit price" : "Unit cost"}
                               className="h-9 w-24 rounded-lg border border-line bg-sunk px-2 text-sm tnum outline-none focus:border-pine"
                             />
                           </label>
@@ -467,6 +482,51 @@ export function StockForm({
         </div>
       </div>
     </div>
+  );
+}
+
+/* A number box you can clear and retype (a plain number input snaps back to 0 on phones). */
+function NumberBox({
+  value,
+  onValue,
+  label,
+  className,
+  autoFocus,
+}: {
+  value: number;
+  onValue: (n: number) => void;
+  label: string;
+  className?: string;
+  autoFocus?: boolean;
+}) {
+  const [text, setText] = useState(String(value));
+  const ref = useRef<HTMLInputElement>(null);
+  // Follow changes made elsewhere (the + / − buttons).
+  const [last, setLast] = useState(value);
+  if (value !== last) {
+    setLast(value);
+    if (Number(text) !== value) setText(String(value));
+  }
+  useEffect(() => {
+    if (autoFocus) ref.current?.focus({ preventScroll: false });
+  }, [autoFocus]);
+  return (
+    <input
+      ref={ref}
+      type="text"
+      inputMode="decimal"
+      enterKeyHint="done"
+      value={text}
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => {
+        const t = e.target.value.replace(/[^\d.]/g, "");
+        setText(t);
+        onValue(t === "" ? 0 : Number(t) || 0);
+      }}
+      onBlur={() => setText(String(value))}
+      aria-label={label}
+      className={className}
+    />
   );
 }
 
